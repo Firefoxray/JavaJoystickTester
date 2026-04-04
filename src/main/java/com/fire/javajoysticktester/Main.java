@@ -1,28 +1,21 @@
 package com.fire.javajoysticktester;
 
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.SwingConstants;
+import com.fire.javajoysticktester.ui.MainWindow;
+
 import javax.swing.SwingUtilities;
 
-public class Main {
+/**
+ * Application entry point.
+ */
+public final class Main {
+    private Main() {
+        // Utility class; do not instantiate.
+    }
+
     public static void main(String[] args) {
-
-
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("Java Joystick Tester");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(800, 600);
-
-            JLabel label = new JLabel("Joystick Tester starting...", SwingConstants.CENTER);
-            frame.add(label);
-
-            frame.setLocationRelativeTo(null);
-            frame.setVisible(true);
+            MainWindow window = new MainWindow();
+            window.showWindow();
         });
-
-        //
-        System.out.println("new project");
-        //
     }
 }
