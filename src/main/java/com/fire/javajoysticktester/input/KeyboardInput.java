@@ -21,8 +21,13 @@ public class KeyboardInput implements KeyListener {
     private boolean wPressed;
     private boolean sPressed;
 
-    private final double angularSpeedDegPerSec = 90.0;
-    private final double throttleUnitsPerSec = 0.4;
+    private final double angularSpeedDegPerSec = 120.0;
+    private final double throttleUnitsPerSec = 0.55;
+
+    private final boolean autoCenterPitch = true;
+    private final boolean autoCenterYaw = true;
+    private final boolean autoCenterRoll = true;
+    private final double autoCenterDegPerSec = 180.0;
 
     /**
      * Apply currently active keys to the ship model once per update tick.
@@ -33,30 +38,43 @@ public class KeyboardInput implements KeyListener {
     public void update(ShipState shipState, double deltaTimeSec) {
         double angleStep = angularSpeedDegPerSec * deltaTimeSec;
         double throttleStep = throttleUnitsPerSec * deltaTimeSec;
+        double centerStep = autoCenterDegPerSec * deltaTimeSec;
 
         if (upPressed) {
-            shipState.addPitch(-angleStep);
+            shipState.addPitchTarget(-angleStep);
         }
         if (downPressed) {
-            shipState.addPitch(angleStep);
+            shipState.addPitchTarget(angleStep);
         }
+        if (!upPressed && !downPressed && autoCenterPitch) {
+            shipState.nudgePitchTargetTowardCenter(centerStep);
+        }
+
         if (leftPressed) {
-            shipState.addYaw(-angleStep);
+            shipState.addYawTarget(-angleStep);
         }
         if (rightPressed) {
-            shipState.addYaw(angleStep);
+            shipState.addYawTarget(angleStep);
         }
+        if (!leftPressed && !rightPressed && autoCenterYaw) {
+            shipState.nudgeYawTargetTowardCenter(centerStep);
+        }
+
         if (qPressed) {
-            shipState.addRoll(-angleStep);
+            shipState.addRollTarget(-angleStep);
         }
         if (ePressed) {
-            shipState.addRoll(angleStep);
+            shipState.addRollTarget(angleStep);
         }
+        if (!qPressed && !ePressed && autoCenterRoll) {
+            shipState.nudgeRollTargetTowardCenter(centerStep);
+        }
+
         if (wPressed) {
-            shipState.addThrottle(throttleStep);
+            shipState.addThrottleTarget(throttleStep);
         }
         if (sPressed) {
-            shipState.addThrottle(-throttleStep);
+            shipState.addThrottleTarget(-throttleStep);
         }
     }
 
