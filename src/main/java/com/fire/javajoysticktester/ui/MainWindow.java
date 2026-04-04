@@ -59,6 +59,7 @@ public class MainWindow {
             lastUpdateNanos = now;
 
             keyboardInput.update(shipState, deltaSec);
+            shipState.update(deltaSec);
             shipPanel.repaint();
         });
 
