@@ -7,6 +7,8 @@ import javax.swing.SwingUtilities;
 
 public class Main {
     public static void main(String[] args) {
+
+
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("Java Joystick Tester");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -18,5 +20,9 @@ public class Main {
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
         });
+
+        //
+        System.out.println("new project");
+        //
     }
 }
