@@ -1,17 +1,21 @@
 package com.fire.javajoysticktester.input;
 
-import com.fire.javajoysticktester.model.ShipState;
-
+import javax.swing.AbstractAction;
+import javax.swing.InputMap;
+import javax.swing.JComponent;
+import javax.swing.KeyStroke;
+import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
- * Keyboard fallback input provider.
+ * Keyboard input handler implemented with Swing key bindings.
  *
- * Later, this can be replaced or supplemented by a joystick implementation
- * that applies the same style of updates to {@link ShipState}.
+ * Key bindings are attached using WHEN_IN_FOCUSED_WINDOW, which is more reliable
+ * than KeyListener for game-style controls in Swing.
  */
-public class KeyboardInput implements KeyListener {
+public class KeyboardInput {
     private boolean upPressed;
     private boolean downPressed;
     private boolean leftPressed;
@@ -21,91 +25,78 @@ public class KeyboardInput implements KeyListener {
     private boolean wPressed;
     private boolean sPressed;
 
-    private final double angularSpeedDegPerSec = 120.0;
-    private final double throttleUnitsPerSec = 0.55;
+    public void install(JComponent component) {
+        InputMap inputMap = component.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
 
-    private final boolean autoCenterPitch = true;
-    private final boolean autoCenterYaw = true;
-    private final boolean autoCenterRoll = true;
-    private final double autoCenterDegPerSec = 180.0;
-
-    /**
-     * Apply currently active keys to the ship model once per update tick.
-     *
-     * @param shipState mutable ship state
-     * @param deltaTimeSec elapsed time in seconds since last update
-     */
-    public void update(ShipState shipState, double deltaTimeSec) {
-        double angleStep = angularSpeedDegPerSec * deltaTimeSec;
-        double throttleStep = throttleUnitsPerSec * deltaTimeSec;
-        double centerStep = autoCenterDegPerSec * deltaTimeSec;
-
-        if (upPressed) {
-            shipState.addPitchTarget(-angleStep);
-        }
-        if (downPressed) {
-            shipState.addPitchTarget(angleStep);
-        }
-        if (!upPressed && !downPressed && autoCenterPitch) {
-            shipState.nudgePitchTargetTowardCenter(centerStep);
-        }
-
-        if (leftPressed) {
-            shipState.addYawTarget(-angleStep);
-        }
-        if (rightPressed) {
-            shipState.addYawTarget(angleStep);
-        }
-        if (!leftPressed && !rightPressed && autoCenterYaw) {
-            shipState.nudgeYawTargetTowardCenter(centerStep);
-        }
-
-        if (qPressed) {
-            shipState.addRollTarget(-angleStep);
-        }
-        if (ePressed) {
-            shipState.addRollTarget(angleStep);
-        }
-        if (!qPressed && !ePressed && autoCenterRoll) {
-            shipState.nudgeRollTargetTowardCenter(centerStep);
-        }
-
-        if (wPressed) {
-            shipState.addThrottleTarget(throttleStep);
-        }
-        if (sPressed) {
-            shipState.addThrottleTarget(-throttleStep);
-        }
+        bind(component, inputMap, KeyEvent.VK_UP, "pitchUp", () -> upPressed = true, () -> upPressed = false);
+        bind(component, inputMap, KeyEvent.VK_DOWN, "pitchDown", () -> downPressed = true, () -> downPressed = false);
+        bind(component, inputMap, KeyEvent.VK_LEFT, "yawLeft", () -> leftPressed = true, () -> leftPressed = false);
+        bind(component, inputMap, KeyEvent.VK_RIGHT, "yawRight", () -> rightPressed = true, () -> rightPressed = false);
+        bind(component, inputMap, KeyEvent.VK_Q, "rollLeft", () -> qPressed = true, () -> qPressed = false);
+        bind(component, inputMap, KeyEvent.VK_E, "rollRight", () -> ePressed = true, () -> ePressed = false);
+        bind(component, inputMap, KeyEvent.VK_W, "throttleUp", () -> wPressed = true, () -> wPressed = false);
+        bind(component, inputMap, KeyEvent.VK_S, "throttleDown", () -> sPressed = true, () -> sPressed = false);
     }
 
-    @Override
-    public void keyTyped(KeyEvent e) {
-        // Not used.
+    public KeyboardSnapshot snapshot() {
+        return new KeyboardSnapshot(upPressed, downPressed, leftPressed, rightPressed, qPressed, ePressed, wPressed, sPressed);
     }
 
-    @Override
-    public void keyPressed(KeyEvent e) {
-        setKeyState(e.getKeyCode(), true);
+    public boolean hasAnyInputActive() {
+        return upPressed || downPressed || leftPressed || rightPressed || qPressed || ePressed || wPressed || sPressed;
     }
 
-    @Override
-    public void keyReleased(KeyEvent e) {
-        setKeyState(e.getKeyCode(), false);
+    public static Map<String, String> getBindingDescriptions() {
+        Map<String, String> bindings = new LinkedHashMap<>();
+        bindings.put("Pitch Up", "Up Arrow");
+        bindings.put("Pitch Down", "Down Arrow");
+        bindings.put("Yaw Left", "Left Arrow");
+        bindings.put("Yaw Right", "Right Arrow");
+        bindings.put("Roll Left", "Q");
+        bindings.put("Roll Right", "E");
+        bindings.put("Throttle Up", "W");
+        bindings.put("Throttle Down", "S");
+        return bindings;
     }
 
-    private void setKeyState(int keyCode, boolean pressed) {
-        switch (keyCode) {
-            case KeyEvent.VK_UP -> upPressed = pressed;
-            case KeyEvent.VK_DOWN -> downPressed = pressed;
-            case KeyEvent.VK_LEFT -> leftPressed = pressed;
-            case KeyEvent.VK_RIGHT -> rightPressed = pressed;
-            case KeyEvent.VK_Q -> qPressed = pressed;
-            case KeyEvent.VK_E -> ePressed = pressed;
-            case KeyEvent.VK_W -> wPressed = pressed;
-            case KeyEvent.VK_S -> sPressed = pressed;
-            default -> {
-                // Ignore unsupported keys.
+    private static void bind(
+            JComponent component,
+            InputMap inputMap,
+            int keyCode,
+            String actionKey,
+            Runnable onPress,
+            Runnable onRelease
+    ) {
+        String pressedKey = actionKey + ".pressed";
+        String releasedKey = actionKey + ".released";
+
+        inputMap.put(KeyStroke.getKeyStroke(keyCode, 0, false), pressedKey);
+        inputMap.put(KeyStroke.getKeyStroke(keyCode, 0, true), releasedKey);
+
+        component.getActionMap().put(pressedKey, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                onPress.run();
             }
-        }
+        });
+
+        component.getActionMap().put(releasedKey, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                onRelease.run();
+            }
+        });
+    }
+
+    public record KeyboardSnapshot(
+            boolean up,
+            boolean down,
+            boolean left,
+            boolean right,
+            boolean rollLeft,
+            boolean rollRight,
+            boolean throttleUp,
+            boolean throttleDown
+    ) {
     }
 }

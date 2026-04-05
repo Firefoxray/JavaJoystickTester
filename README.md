@@ -1,2 +1,61 @@
-# JavaJoystickTester
-Joystick Tester in Java
+# Java Joystick Tester (0.1 Alpha)
+
+A Swing/Java2D flight-input sandbox for testing keyboard and joystick controls against a simple ship debug HUD.
+
+## Version
+Current version: `0.1 Alpha`
+
+## What works in this version
+- Main entry point remains `com.fire.javajoysticktester.Main`.
+- Fixed keyboard input handling by using Swing key bindings (`WHEN_IN_FOCUSED_WINDOW`) instead of frame-level `KeyListener`.
+- Real-time ship HUD for pitch, yaw, roll, and throttle.
+- Input architecture split into keyboard input, joystick input, and shared input system.
+- Joystick detection and polling via **JInput**.
+- On-screen joystick status (connected device name, T.16000M detection, raw axis values).
+- Settings menu for preferred input device selection and controls/status view.
+
+## Controls
+Keyboard (fallback and explicit mode):
+- `Up/Down`: Pitch
+- `Left/Right`: Yaw
+- `Q/E`: Roll
+- `W/S`: Throttle
+
+Menu:
+- `Settings -> Preferred Input`: `Auto`, `Keyboard`, `Joystick`
+- `Settings -> Controls & Input Status...`: Shows bindings, active status, detected controllers
+
+## Joystick support
+Library added:
+- `net.java.jinput:jinput:2.0.10`
+- `net.java.jinput:jinput-platform:2.0.10:natives-all` (runtime natives)
+
+Current joystick behavior:
+- Detects connected stick/gamepad/wheel devices
+- Lists controller names
+- Detects Thrustmaster T.16000M by name match (`T.16000` / `T16000`)
+- Reads raw analog/button values for debug display
+- Falls back to keyboard when no joystick is available (or when keyboard is selected)
+
+## Run from IntelliJ
+You should keep running from `Main`:
+- Class: `com.fire.javajoysticktester.Main`
+
+From terminal:
+```bash
+./gradlew run
+```
+
+## Limitations (0.1 Alpha)
+- Joystick axis mapping is generic and may vary by hardware.
+- No persistent control remapping UI yet.
+- No hot-plug notifications yet (controllers are polled each frame).
+
+## Project layout
+- `Main.java` – app entry point
+- `ui/...` – frame/menu/update loop
+- `render/...` – HUD and ship rendering
+- `model/...` – mutable ship model/state
+- `input/...` – keyboard, joystick, and shared input system
+
+See `CHANGELOG.md` for detailed per-change history.
