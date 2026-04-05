@@ -1,5 +1,7 @@
 package com.fire.javajoysticktester.render;
 
+import com.fire.javajoysticktester.input.JoystickSnapshot;
+import com.fire.javajoysticktester.input.PreferredInputDevice;
 import com.fire.javajoysticktester.model.ShipState;
 
 import javax.swing.JPanel;
@@ -10,26 +12,24 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.RenderingHints;
+import java.util.Map;
+import java.util.StringJoiner;
 
 /**
  * Rendering surface.
- *
- * Draws a lightweight low-poly ship by rotating 3D model points, then projecting
- * them into screen space. Also renders simple flight references (stars + horizon)
- * so pitch/yaw/roll are easier to read.
  */
 public class ShipPanel extends JPanel {
     private static final double[][] SHIP_VERTICES = {
-            {0.00, 0.00, 2.10},   // 0 nose
-            {-0.35, 0.12, 0.90},  // 1 upper-left front
-            {0.35, 0.12, 0.90},   // 2 upper-right front
-            {-0.35, -0.12, 0.90}, // 3 lower-left front
-            {0.35, -0.12, 0.90},  // 4 lower-right front
-            {-1.35, -0.05, -0.40},// 5 left wing tip
-            {1.35, -0.05, -0.40}, // 6 right wing tip
-            {0.00, 0.36, -0.55},  // 7 dorsal fin
-            {0.00, -0.36, -0.55}, // 8 ventral fin
-            {0.00, 0.00, -1.25}   // 9 engine
+            {0.00, 0.00, 2.10},
+            {-0.35, 0.12, 0.90},
+            {0.35, 0.12, 0.90},
+            {-0.35, -0.12, 0.90},
+            {0.35, -0.12, 0.90},
+            {-1.35, -0.05, -0.40},
+            {1.35, -0.05, -0.40},
+            {0.00, 0.36, -0.55},
+            {0.00, -0.36, -0.55},
+            {0.00, 0.00, -1.25}
     };
 
     private static final int[][] SHIP_EDGES = {
@@ -44,10 +44,20 @@ public class ShipPanel extends JPanel {
 
     private final ShipState shipState;
 
+    private PreferredInputDevice preferredInputDevice = PreferredInputDevice.AUTO;
+    private boolean keyboardActive;
+    private JoystickSnapshot joystickSnapshot = JoystickSnapshot.disconnected(java.util.List.of());
+
     public ShipPanel(ShipState shipState) {
         this.shipState = shipState;
         setBackground(new Color(8, 12, 24));
         setFocusable(true);
+    }
+
+    public void updateInputDebug(PreferredInputDevice preferredInputDevice, boolean keyboardActive, JoystickSnapshot joystickSnapshot) {
+        this.preferredInputDevice = preferredInputDevice;
+        this.keyboardActive = keyboardActive;
+        this.joystickSnapshot = joystickSnapshot;
     }
 
     @Override
@@ -182,7 +192,7 @@ public class ShipPanel extends JPanel {
         int lineHeight = 18;
 
         g2d.setColor(new Color(220, 240, 255));
-        g2d.drawString("Ship Debug", x, y);
+        g2d.drawString("Java Joystick Tester (0.1 Alpha)", x, y);
 
         g2d.setColor(new Color(170, 220, 255));
         g2d.drawString(String.format("Pitch: %7.2f°  (target %7.2f°)", shipState.getPitchDegrees(), shipState.getTargetPitchDegrees()), x, y + lineHeight);
@@ -192,7 +202,28 @@ public class ShipPanel extends JPanel {
 
         g2d.setColor(new Color(130, 190, 235));
         g2d.drawString("Controls: Arrows=Pitch/Yaw, Q/E=Roll, W/S=Throttle", x, y + lineHeight * 6);
-        g2d.drawString("Auto-center: Pitch/Yaw/Roll enabled", x, y + lineHeight * 7);
+        g2d.drawString("Settings menu: choose input device + open Controls & Input Status", x, y + lineHeight * 7);
+
+        g2d.drawString("Preferred Input: " + preferredInputDevice + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 8);
+        g2d.drawString("Joystick: " + (joystickSnapshot.connected() ? joystickSnapshot.controllerName() : "Not connected"), x, y + lineHeight * 9);
+        g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO"), x, y + lineHeight * 10);
+        g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 11);
+    }
+
+    private static String formatAxes(Map<String, Float> axes) {
+        if (axes.isEmpty()) {
+            return "none";
+        }
+        StringJoiner joiner = new StringJoiner(", ");
+        int count = 0;
+        for (Map.Entry<String, Float> entry : axes.entrySet()) {
+            joiner.add(entry.getKey() + "=" + String.format("%.2f", entry.getValue()));
+            count++;
+            if (count >= 6) {
+                break;
+            }
+        }
+        return joiner.toString();
     }
 
     private static Point rotate2D(int x, int y, double cos, double sin, int cx, int cy) {

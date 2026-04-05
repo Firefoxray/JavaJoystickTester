@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.fire"
-version = "0.1.0"
+version = "0.1 Alpha"
 
 java {
     toolchain {
@@ -14,6 +14,11 @@ java {
 
 repositories {
     mavenCentral()
+}
+
+dependencies {
+    implementation("net.java.jinput:jinput:2.0.10")
+    runtimeOnly("net.java.jinput:jinput-platform:2.0.10:natives-all")
 }
 
 application {
