@@ -26,11 +26,19 @@ public class JoystickInput {
         final Controller[] controllers;
         try {
             controllers = ControllerEnvironment.getDefaultEnvironment().getControllers();
-        } catch (RuntimeException ex) {
+        } catch (RuntimeException | LinkageError ex) {
             boolean permissionDenied = linuxPermissionStatus.permissionDenied() || isPermissionDenied(ex);
-            String status = permissionDenied
-                    ? "Linux joystick access denied (Permission denied on /dev/input/event*)."
-                    : "Failed to query joystick controllers: " + ex.getClass().getSimpleName();
+            boolean nativeLibraryMissing = isNativeLibraryMissing(ex);
+
+            String status;
+            if (permissionDenied) {
+                status = "Linux joystick access denied (Permission denied on /dev/input/event*).";
+            } else if (nativeLibraryMissing) {
+                status = "JInput native library not available (jinput-linux64 missing from java.library.path).";
+            } else {
+                status = "Failed to query joystick controllers: " + ex.getClass().getSimpleName();
+            }
+
             return JoystickSnapshot.disconnected(names, status, permissionDenied);
         }
 
@@ -96,6 +104,22 @@ public class JoystickInput {
     private static boolean isPermissionDenied(Throwable throwable) {
         String message = throwable.getMessage();
         return message != null && message.toLowerCase(Locale.ROOT).contains("permission denied");
+    }
+
+
+    private static boolean isNativeLibraryMissing(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof UnsatisfiedLinkError) {
+                String message = current.getMessage();
+                return message != null
+                        && message.toLowerCase(Locale.ROOT).contains("jinput-linux")
+                        && message.toLowerCase(Locale.ROOT).contains("java.library.path");
+            }
+            current = current.getCause();
+        }
+
+        return false;
     }
 
     private static LinuxPermissionStatus probeLinuxPermissionStatus() {
