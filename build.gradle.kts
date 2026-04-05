@@ -1,6 +1,7 @@
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.tasks.Sync
+import org.gradle.jvm.application.tasks.CreateStartScripts
 
 plugins {
     application
@@ -26,6 +27,7 @@ dependencies {
 }
 
 val jinputNativesDir = layout.buildDirectory.dir("jinput-natives")
+val jinputLibraryPath = jinputNativesDir.map { it.asFile.absolutePath }
 
 val extractJinputNatives by tasks.registering(Sync::class) {
     group = "build setup"
@@ -58,10 +60,16 @@ application {
     mainClass.set("com.fire.javajoysticktester.Main")
 }
 
-tasks.named<JavaExec>("run") {
+tasks.withType<JavaExec>().configureEach {
+    dependsOn(extractJinputNatives)
+    systemProperty("java.library.path", jinputLibraryPath.get())
+}
+
+tasks.withType<CreateStartScripts>().configureEach {
     dependsOn(extractJinputNatives)
 
-    systemProperty("java.library.path", jinputNativesDir.get().asFile.absolutePath)
+    defaultJvmOpts = (defaultJvmOpts ?: emptyList()) +
+            "-Djava.library.path=${jinputLibraryPath.get()}"
 }
 
 tasks.test {
