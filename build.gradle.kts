@@ -61,10 +61,7 @@ application {
 tasks.named<JavaExec>("run") {
     dependsOn(extractJinputNatives)
 
-    doFirst {
-        val nativePath = jinputNativesDir.get().asFile.absolutePath
-        jvmArgs("-Djava.library.path=$nativePath")
-    }
+    systemProperty("java.library.path", jinputNativesDir.get().asFile.absolutePath)
 }
 
 tasks.test {
