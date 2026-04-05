@@ -55,6 +55,22 @@ public class ShipState {
         return targetThrottle;
     }
 
+    public void setPitchTargetDegrees(double pitchDegrees) {
+        targetPitchDegrees = clamp(pitchDegrees, -MAX_PITCH_DEGREES, MAX_PITCH_DEGREES);
+    }
+
+    public void setYawTargetDegrees(double yawDegrees) {
+        targetYawDegrees = wrapAngle(yawDegrees);
+    }
+
+    public void setRollTargetDegrees(double rollDegrees) {
+        targetRollDegrees = clamp(rollDegrees, -MAX_ROLL_DEGREES, MAX_ROLL_DEGREES);
+    }
+
+    public void setThrottleTarget(double throttle) {
+        targetThrottle = clamp(throttle, 0.0, 1.0);
+    }
+
     public void addPitchTarget(double deltaDegrees) {
         targetPitchDegrees = clamp(targetPitchDegrees + deltaDegrees, -MAX_PITCH_DEGREES, MAX_PITCH_DEGREES);
     }
