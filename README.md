@@ -13,7 +13,7 @@ Current version: `0.1 Alpha`
 - Input architecture split into keyboard input, joystick input, and shared input system.
 - Joystick detection and polling via **JInput**.
 - On-screen joystick status (connected device name, access status, T.16000M detection, raw axis values).
-- Settings menu for preferred input device selection and controls/status view.
+- Settings menu for preferred input device selection, joystick-controller selection, and controls/status view.
 
 ## Controls
 Keyboard (fallback and explicit mode):
@@ -24,7 +24,19 @@ Keyboard (fallback and explicit mode):
 
 Menu:
 - `Settings -> Preferred Input`: `Auto`, `Keyboard`, `Joystick`
-- `Settings -> Controls & Input Status...`: Shows bindings, active status, detected controllers
+- `Settings -> Joystick Controller`: `Auto-select (prefer T.16000M)` or manually choose any detected controller
+- `Settings -> Joystick Mapping`: remap pitch/yaw/roll/throttle axes and choose trigger button/action
+- `Settings -> Controls & Input Status...`: Shows bindings, active status, mappings, and all detected controller names
+
+## Controller selection behavior
+- Auto-selection now prefers **Thrustmaster T.16000M** whenever detected.
+- If no T.16000M is available, auto mode scores devices to prefer flight-oriented controllers and deprioritize common virtual/irrelevant entries (for example Steam virtual controllers).
+- You can manually pin any detected controller from `Settings -> Joystick Controller`.
+- HUD + status dialog now call out the currently active input/controller for clarity.
+- Keyboard fallback remains active whenever joystick driving is unavailable or keyboard mode is selected.
+- Joystick flight input now uses direct Star-Fox-style target control (stick deflection maps directly to ship target pitch/yaw/roll) so steering feels tied to the ship itself.
+- Starfield now flows toward the camera to reinforce forward motion, with speed influenced by throttle.
+- Trigger button mapping supports `NONE`, `BOOST`, or `FIRE_PRIMARY` actions (default trigger button is Button 0).
 
 ## Linux joystick permissions (`/dev/input/event*`)
 On Linux, JInput commonly reads joystick/gamepad events through `/dev/input/event*` nodes.

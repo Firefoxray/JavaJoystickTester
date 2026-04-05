@@ -47,6 +47,9 @@ public class ShipPanel extends JPanel {
     private PreferredInputDevice preferredInputDevice = PreferredInputDevice.AUTO;
     private boolean keyboardActive;
     private JoystickSnapshot joystickSnapshot = JoystickSnapshot.disconnected(java.util.List.of());
+    private String activeInputDescription = "Keyboard";
+
+    private long lastStarNanos = System.nanoTime();
 
     public ShipPanel(ShipState shipState) {
         this.shipState = shipState;
@@ -54,10 +57,11 @@ public class ShipPanel extends JPanel {
         setFocusable(true);
     }
 
-    public void updateInputDebug(PreferredInputDevice preferredInputDevice, boolean keyboardActive, JoystickSnapshot joystickSnapshot) {
+    public void updateInputDebug(PreferredInputDevice preferredInputDevice, boolean keyboardActive, JoystickSnapshot joystickSnapshot, String activeInputDescription) {
         this.preferredInputDevice = preferredInputDevice;
         this.keyboardActive = keyboardActive;
         this.joystickSnapshot = joystickSnapshot;
+        this.activeInputDescription = activeInputDescription;
     }
 
     @Override
@@ -81,60 +85,40 @@ public class ShipPanel extends JPanel {
         int centerX = width / 2;
         int centerY = height / 2;
 
+        updateStarField();
         drawStars(g2d, centerX, centerY, width, height);
-
-        double pitchOffset = shipState.getPitchDegrees() * 3.0;
-        double rollRad = Math.toRadians(shipState.getRollDegrees());
-        double cos = Math.cos(rollRad);
-        double sin = Math.sin(rollRad);
-
-        g2d.setColor(new Color(52, 90, 130, 170));
-        g2d.setStroke(new BasicStroke(2f));
-
-        int halfSpan = Math.max(width, height);
-        int x1 = -halfSpan;
-        int y1 = (int) Math.round(pitchOffset);
-        int x2 = halfSpan;
-        int y2 = (int) Math.round(pitchOffset);
-
-        Point p1 = rotate2D(x1, y1, cos, sin, centerX, centerY);
-        Point p2 = rotate2D(x2, y2, cos, sin, centerX, centerY);
-        g2d.drawLine(p1.x, p1.y, p2.x, p2.y);
-
-        g2d.setStroke(new BasicStroke(1f));
-        g2d.setColor(new Color(44, 70, 104, 110));
-        for (int i = -3; i <= 3; i++) {
-            if (i == 0) {
-                continue;
-            }
-            int gy = (int) Math.round(pitchOffset + i * 44);
-            Point ga = rotate2D(-halfSpan, gy, cos, sin, centerX, centerY);
-            Point gb = rotate2D(halfSpan, gy, cos, sin, centerX, centerY);
-            g2d.drawLine(ga.x, ga.y, gb.x, gb.y);
-        }
-
         drawCenterReticle(g2d, centerX, centerY);
     }
 
-    private void drawStars(Graphics2D g2d, int centerX, int centerY, int width, int height) {
-        double yawShift = shipState.getYawDegrees() * 6.0;
-        double pitchShift = shipState.getPitchDegrees() * 4.0;
-        double speedParallax = shipState.getThrottle() * 20.0;
+    private void updateStarField() {
+        long now = System.nanoTime();
+        double deltaSec = Math.max(0.0, (now - lastStarNanos) / 1_000_000_000.0);
+        lastStarNanos = now;
 
+        double speed = 0.5 + shipState.getThrottle() * 2.8;
         for (double[] star : STAR_FIELD) {
-            double sx = wrapToRange(star[0] + yawShift * star[2], -620.0, 620.0);
-            double sy = wrapToRange(star[1] + pitchShift * star[2] + speedParallax * (star[2] - 0.6), -420.0, 420.0);
+            star[2] -= deltaSec * speed;
+            if (star[2] <= 0.08) {
+                resetStar(star, (int) (star[3] * 1000));
+            }
+        }
+    }
 
-            int x = centerX + (int) Math.round(sx);
-            int y = centerY + (int) Math.round(sy);
+    private void drawStars(Graphics2D g2d, int centerX, int centerY, int width, int height) {
+        for (double[] star : STAR_FIELD) {
+            double depth = Math.max(0.1, star[2]);
+            double perspective = 1.0 / depth;
+
+            int x = centerX + (int) Math.round(star[0] * perspective);
+            int y = centerY + (int) Math.round(star[1] * perspective);
 
             if (x < 0 || x >= width || y < 0 || y >= height) {
                 continue;
             }
 
-            int shade = (int) Math.round(120 + star[2] * 115);
-            g2d.setColor(new Color(shade, shade, 255, 160));
-            int size = star[2] > 0.82 ? 2 : 1;
+            int shade = (int) Math.round(140 + (1.0 - depth) * 110);
+            g2d.setColor(new Color(shade, shade, 255, 180));
+            int size = depth < 0.35 ? 3 : (depth < 0.7 ? 2 : 1);
             g2d.fillRect(x, y, size, size);
         }
     }
@@ -202,10 +186,10 @@ public class ShipPanel extends JPanel {
 
         g2d.setColor(new Color(130, 190, 235));
         g2d.drawString("Controls: Arrows=Pitch/Yaw, Q/E=Roll, W/S=Throttle", x, y + lineHeight * 6);
-        g2d.drawString("Settings menu: choose input device + open Controls & Input Status", x, y + lineHeight * 7);
+        g2d.drawString("Settings menu: choose input, controller, mapping", x, y + lineHeight * 7);
 
-        g2d.drawString("Preferred Input: " + preferredInputDevice + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 8);
-        g2d.drawString("Joystick: " + (joystickSnapshot.connected() ? joystickSnapshot.controllerName() : "Not connected"), x, y + lineHeight * 9);
+        g2d.drawString("Preferred Input: " + preferredInputDevice + " | Active: " + activeInputDescription, x, y + lineHeight * 8);
+        g2d.drawString("Joystick: " + (joystickSnapshot.connected() ? joystickSnapshot.controllerName() : "Not connected") + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 9);
         g2d.drawString("Joystick access: " + joystickSnapshot.accessStatus(), x, y + lineHeight * 10);
         g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO"), x, y + lineHeight * 11);
         g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 12);
@@ -227,33 +211,23 @@ public class ShipPanel extends JPanel {
         return joiner.toString();
     }
 
-    private static Point rotate2D(int x, int y, double cos, double sin, int cx, int cy) {
-        int rx = (int) Math.round(x * cos - y * sin) + cx;
-        int ry = (int) Math.round(x * sin + y * cos) + cy;
-        return new Point(rx, ry);
-    }
-
-    private static double wrapToRange(double value, double min, double max) {
-        double range = max - min;
-        double wrapped = (value - min) % range;
-        if (wrapped < 0) {
-            wrapped += range;
-        }
-        return wrapped + min;
-    }
-
     private static double[][] buildStars() {
-        int starCount = 90;
-        double[][] stars = new double[starCount][3];
+        int starCount = 120;
+        double[][] stars = new double[starCount][4];
         for (int i = 0; i < starCount; i++) {
-            double x = -600.0 + ((i * 137) % 1200);
-            double y = -380.0 + ((i * 89) % 760);
-            double brightness = 0.45 + (((i * 53) % 100) / 100.0) * 0.55;
-            stars[i][0] = x;
-            stars[i][1] = y;
-            stars[i][2] = brightness;
+            resetStar(stars[i], i);
         }
         return stars;
+    }
+
+    private static void resetStar(double[] star, int seed) {
+        double nx = (((seed * 73) % 1000) / 999.0) * 2.0 - 1.0;
+        double ny = (((seed * 151 + 37) % 1000) / 999.0) * 2.0 - 1.0;
+        double depth = 0.35 + (((seed * 199 + 11) % 1000) / 999.0) * 1.2;
+        star[0] = nx * 460.0;
+        star[1] = ny * 320.0;
+        star[2] = depth;
+        star[3] = seed;
     }
 
     private static double[] rotateXYZ(double x, double y, double z,

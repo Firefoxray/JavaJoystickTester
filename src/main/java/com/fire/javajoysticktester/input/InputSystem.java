@@ -2,6 +2,7 @@ package com.fire.javajoysticktester.input;
 
 import com.fire.javajoysticktester.model.ShipState;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -13,11 +14,23 @@ public class InputSystem {
     private static final double AUTO_CENTER_DEG_PER_SEC = 180.0;
     private static final double JOYSTICK_DEADZONE = 0.08;
 
+    private static final double STARFOX_MAX_PITCH = 42.0;
+    private static final double STARFOX_MAX_YAW = 55.0;
+    private static final double STARFOX_MAX_ROLL = 70.0;
+
     private final KeyboardInput keyboardInput;
     private final JoystickInput joystickInput;
 
     private PreferredInputDevice preferredInputDevice = PreferredInputDevice.AUTO;
     private JoystickSnapshot lastJoystickSnapshot = JoystickSnapshot.disconnected(java.util.List.of());
+    private String activeInputDescription = "Keyboard";
+
+    private JoystickAxisOption pitchAxis = JoystickAxisOption.Y;
+    private JoystickAxisOption yawAxis = JoystickAxisOption.X;
+    private JoystickAxisOption rollAxis = JoystickAxisOption.RZ;
+    private JoystickAxisOption throttleAxis = JoystickAxisOption.SLIDER;
+    private int triggerButtonIndex = 0;
+    private JoystickButtonAction triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
 
     public InputSystem(KeyboardInput keyboardInput, JoystickInput joystickInput) {
         this.keyboardInput = keyboardInput;
@@ -35,8 +48,10 @@ public class InputSystem {
 
         if (joystickShouldDrive) {
             applyJoystick(shipState, lastJoystickSnapshot, deltaTimeSec);
+            activeInputDescription = "Joystick: " + lastJoystickSnapshot.controllerName();
         } else {
             applyKeyboard(shipState, keyboardInput.snapshot(), deltaTimeSec);
+            activeInputDescription = "Keyboard";
         }
     }
 
@@ -54,6 +69,70 @@ public class InputSystem {
 
     public boolean isKeyboardActive() {
         return keyboardInput.hasAnyInputActive();
+    }
+
+    public void setSelectedJoystickName(String selectedJoystickName) {
+        joystickInput.setManualControllerSelection(selectedJoystickName);
+    }
+
+    public String getSelectedJoystickName() {
+        return joystickInput.getManualControllerSelection();
+    }
+
+    public List<String> getDetectedJoystickNames() {
+        return lastJoystickSnapshot.allDetectedControllerNames();
+    }
+
+    public String getActiveInputDescription() {
+        return activeInputDescription;
+    }
+
+    public JoystickAxisOption getPitchAxis() {
+        return pitchAxis;
+    }
+
+    public void setPitchAxis(JoystickAxisOption pitchAxis) {
+        this.pitchAxis = pitchAxis;
+    }
+
+    public JoystickAxisOption getYawAxis() {
+        return yawAxis;
+    }
+
+    public void setYawAxis(JoystickAxisOption yawAxis) {
+        this.yawAxis = yawAxis;
+    }
+
+    public JoystickAxisOption getRollAxis() {
+        return rollAxis;
+    }
+
+    public void setRollAxis(JoystickAxisOption rollAxis) {
+        this.rollAxis = rollAxis;
+    }
+
+    public JoystickAxisOption getThrottleAxis() {
+        return throttleAxis;
+    }
+
+    public void setThrottleAxis(JoystickAxisOption throttleAxis) {
+        this.throttleAxis = throttleAxis;
+    }
+
+    public int getTriggerButtonIndex() {
+        return triggerButtonIndex;
+    }
+
+    public void setTriggerButtonIndex(int triggerButtonIndex) {
+        this.triggerButtonIndex = Math.max(0, triggerButtonIndex);
+    }
+
+    public JoystickButtonAction getTriggerButtonAction() {
+        return triggerButtonAction;
+    }
+
+    public void setTriggerButtonAction(JoystickButtonAction triggerButtonAction) {
+        this.triggerButtonAction = triggerButtonAction;
     }
 
     private void applyKeyboard(ShipState shipState, KeyboardInput.KeyboardSnapshot input, double deltaTimeSec) {
@@ -100,41 +179,74 @@ public class InputSystem {
     }
 
     private void applyJoystick(ShipState shipState, JoystickSnapshot snapshot, double deltaTimeSec) {
-        double angleStep = ANGULAR_SPEED_DEG_PER_SEC * deltaTimeSec;
-        double throttleStep = THROTTLE_UNITS_PER_SEC * deltaTimeSec;
-
         Map<String, Float> axes = snapshot.axes();
 
-        double x = readAxis(axes, "x", "x axis", "x-achsen");
-        double y = readAxis(axes, "y", "y axis", "y-achsen");
-        double rz = readAxis(axes, "rz", "z rotation", "z-rotation");
-        double z = readAxis(axes, "z", "z axis", "z-achsen");
-        double throttleAxis = readAxis(axes, "slider", "throttle", "z");
+        double pitch = withDeadzone(resolveAxisValue(axes, pitchAxis, "y", "y axis", "y-achsen"));
+        double yaw = withDeadzone(resolveAxisValue(axes, yawAxis, "x", "x axis", "x-achsen"));
+        double roll = withDeadzone(resolveAxisValue(axes, rollAxis, "rz", "z rotation", "z-rotation", "z", "z axis", "z-achsen"));
+        double throttle = withDeadzone(resolveAxisValue(axes, throttleAxis, "slider", "throttle", "z"));
 
-        x = withDeadzone(x);
-        y = withDeadzone(y);
-        rz = withDeadzone(rz);
-        z = withDeadzone(z);
-        throttleAxis = withDeadzone(throttleAxis);
+        shipState.setPitchTargetDegrees(pitch * STARFOX_MAX_PITCH);
+        shipState.setYawTargetDegrees(yaw * STARFOX_MAX_YAW);
+        shipState.setRollTargetDegrees(roll * STARFOX_MAX_ROLL);
 
-        shipState.addPitchTarget(y * angleStep);
-        shipState.addYawTarget(x * angleStep);
-        shipState.addRollTarget((Math.abs(rz) > 0.001 ? rz : z) * angleStep);
-
-        if (Math.abs(throttleAxis) > 0.001) {
-            shipState.addThrottleTarget(-throttleAxis * throttleStep);
+        if (throttleAxis != JoystickAxisOption.NONE && Math.abs(throttle) > 0.001) {
+            shipState.setThrottleTarget((-throttle + 1.0) * 0.5);
         }
+
+        if (isButtonPressed(snapshot.buttons(), triggerButtonIndex)) {
+            applyTriggerAction(shipState, deltaTimeSec);
+        }
+    }
+
+    private void applyTriggerAction(ShipState shipState, double deltaTimeSec) {
+        switch (triggerButtonAction) {
+            case NONE -> {
+                // no-op
+            }
+            case BOOST -> shipState.addThrottleTarget(THROTTLE_UNITS_PER_SEC * deltaTimeSec * 2.5);
+            case FIRE_PRIMARY -> shipState.addRollTarget(18.0 * deltaTimeSec);
+        }
+    }
+
+    private static boolean isButtonPressed(Map<String, Boolean> buttons, int targetButtonIndex) {
+        String numericKey = Integer.toString(targetButtonIndex);
+        for (Map.Entry<String, Boolean> entry : buttons.entrySet()) {
+            if (!entry.getValue()) {
+                continue;
+            }
+            String normalized = entry.getKey().trim().toLowerCase();
+            if (normalized.equals(numericKey)
+                    || normalized.equals("button " + numericKey)
+                    || normalized.endsWith(" " + numericKey)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static double withDeadzone(double value) {
         return Math.abs(value) < JOYSTICK_DEADZONE ? 0.0 : value;
     }
 
+    private static double resolveAxisValue(Map<String, Float> axes, JoystickAxisOption option, String... autoAliases) {
+        return switch (option) {
+            case AUTO -> readAxis(axes, autoAliases);
+            case X -> readAxis(axes, "x", "x axis", "x-achsen");
+            case Y -> readAxis(axes, "y", "y axis", "y-achsen");
+            case Z -> readAxis(axes, "z", "z axis", "z-achsen");
+            case RZ -> readAxis(axes, "rz", "z rotation", "z-rotation");
+            case SLIDER -> readAxis(axes, "slider", "throttle");
+            case NONE -> 0.0;
+        };
+    }
+
     private static double readAxis(Map<String, Float> axes, String... aliases) {
         for (Map.Entry<String, Float> entry : axes.entrySet()) {
             String key = entry.getKey().toLowerCase();
             for (String alias : aliases) {
-                if (key.equals(alias.toLowerCase()) || key.contains(alias.toLowerCase())) {
+                String needle = alias.toLowerCase();
+                if (key.equals(needle) || key.contains(needle)) {
                     return entry.getValue();
                 }
             }

@@ -18,8 +18,10 @@ import java.util.Map;
  */
 public class JoystickInput {
     private Controller activeController;
+    private String manualControllerSelection;
 
     public JoystickSnapshot poll() {
+        List<Controller> usableControllers = new ArrayList<>();
         List<String> names = new ArrayList<>();
         LinuxPermissionStatus linuxPermissionStatus = probeLinuxPermissionStatus();
 
@@ -42,17 +44,16 @@ public class JoystickInput {
             return JoystickSnapshot.disconnected(names, status, permissionDenied);
         }
 
-        Controller chosen = null;
         for (Controller controller : controllers) {
             if (isControllerUsable(controller)) {
                 names.add(controller.getName());
-                if (chosen == null) {
-                    chosen = controller;
-                }
+                usableControllers.add(controller);
             }
         }
 
+        Controller chosen = chooseController(usableControllers);
         activeController = chosen;
+
         if (activeController == null) {
             String status = linuxPermissionStatus.permissionDenied()
                     ? linuxPermissionStatus.statusText()
@@ -81,8 +82,7 @@ public class JoystickInput {
         }
 
         String name = activeController.getName();
-        boolean isT16000 = name.toLowerCase(Locale.ROOT).contains("t.16000")
-                || name.toLowerCase(Locale.ROOT).contains("t16000");
+        boolean isT16000 = isT16000Name(name);
 
         return new JoystickSnapshot(
                 true,
@@ -94,6 +94,74 @@ public class JoystickInput {
                 linuxPermissionStatus.statusText(),
                 linuxPermissionStatus.permissionDenied()
         );
+    }
+
+    public void setManualControllerSelection(String manualControllerSelection) {
+        this.manualControllerSelection = (manualControllerSelection == null || manualControllerSelection.isBlank())
+                ? null
+                : manualControllerSelection;
+    }
+
+    public String getManualControllerSelection() {
+        return manualControllerSelection;
+    }
+
+    private Controller chooseController(List<Controller> usableControllers) {
+        if (usableControllers.isEmpty()) {
+            return null;
+        }
+
+        if (manualControllerSelection != null) {
+            for (Controller controller : usableControllers) {
+                if (controller.getName().equals(manualControllerSelection)) {
+                    return controller;
+                }
+            }
+        }
+
+        Controller best = null;
+        int bestScore = Integer.MIN_VALUE;
+        for (Controller controller : usableControllers) {
+            int score = scoreForAutoSelection(controller);
+            if (score > bestScore) {
+                bestScore = score;
+                best = controller;
+            }
+        }
+
+        return best;
+    }
+
+    private static int scoreForAutoSelection(Controller controller) {
+        String normalizedName = controller.getName().toLowerCase(Locale.ROOT);
+        int score = 0;
+
+        if (isT16000Name(normalizedName)) {
+            score += 10_000;
+        }
+
+        Controller.Type type = controller.getType();
+        if (type == Controller.Type.STICK) {
+            score += 500;
+        } else if (type == Controller.Type.WHEEL) {
+            score += 200;
+        } else if (type == Controller.Type.GAMEPAD) {
+            score += 100;
+        }
+
+        if (normalizedName.contains("steam") || normalizedName.contains("virtual")) {
+            score -= 2_000;
+        }
+        if (normalizedName.contains("xbox") || normalizedName.contains("dualshock") || normalizedName.contains("wireless controller")) {
+            score -= 300;
+        }
+
+        return score;
+    }
+
+    private static boolean isT16000Name(String name) {
+        String normalized = name.toLowerCase(Locale.ROOT);
+        return normalized.contains("t.16000") || normalized.contains("t16000");
     }
 
     private static boolean isControllerUsable(Controller controller) {
