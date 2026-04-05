@@ -10,9 +10,26 @@ public record JoystickSnapshot(
         boolean thrustmasterT16000MDetected,
         Map<String, Float> axes,
         Map<String, Boolean> buttons,
-        List<String> allDetectedControllerNames
+        List<String> allDetectedControllerNames,
+        String accessStatus,
+        boolean linuxPermissionDenied
 ) {
     public static JoystickSnapshot disconnected(List<String> allDetectedControllerNames) {
-        return new JoystickSnapshot(false, "None", false, Collections.emptyMap(), Collections.emptyMap(), allDetectedControllerNames);
+        return disconnected(allDetectedControllerNames, "No joystick detected", false);
+    }
+
+    public static JoystickSnapshot disconnected(List<String> allDetectedControllerNames,
+                                                String accessStatus,
+                                                boolean linuxPermissionDenied) {
+        return new JoystickSnapshot(
+                false,
+                "None",
+                false,
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                allDetectedControllerNames,
+                accessStatus,
+                linuxPermissionDenied
+        );
     }
 }

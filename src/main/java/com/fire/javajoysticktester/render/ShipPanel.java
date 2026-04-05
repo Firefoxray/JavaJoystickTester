@@ -206,8 +206,9 @@ public class ShipPanel extends JPanel {
 
         g2d.drawString("Preferred Input: " + preferredInputDevice + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 8);
         g2d.drawString("Joystick: " + (joystickSnapshot.connected() ? joystickSnapshot.controllerName() : "Not connected"), x, y + lineHeight * 9);
-        g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO"), x, y + lineHeight * 10);
-        g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 11);
+        g2d.drawString("Joystick access: " + joystickSnapshot.accessStatus(), x, y + lineHeight * 10);
+        g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO"), x, y + lineHeight * 11);
+        g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 12);
     }
 
     private static String formatAxes(Map<String, Float> axes) {
