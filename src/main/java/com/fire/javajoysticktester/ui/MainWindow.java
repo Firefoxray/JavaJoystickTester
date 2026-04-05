@@ -101,8 +101,13 @@ public class MainWindow {
         text.append(" - Preferred input: ").append(inputSystem.getPreferredInputDevice()).append("\n");
         text.append(" - Keyboard active: ").append(inputSystem.isKeyboardActive() ? "YES" : "NO").append("\n");
         text.append(" - Joystick connected: ").append(snapshot.connected() ? "YES" : "NO").append("\n");
+        text.append(" - Joystick access: ").append(snapshot.accessStatus()).append("\n");
         text.append(" - Active controller: ").append(snapshot.controllerName()).append("\n");
         text.append(" - T.16000M detected: ").append(snapshot.thrustmasterT16000MDetected() ? "YES" : "NO").append("\n");
+
+        if (snapshot.linuxPermissionDenied()) {
+            text.append("\nLinux hint: your user may need active-seat ACLs (logind/udev) or input-group access for /dev/input/event*.\n");
+        }
 
         if (!snapshot.allDetectedControllerNames().isEmpty()) {
             text.append("\nDetected controllers:\n");

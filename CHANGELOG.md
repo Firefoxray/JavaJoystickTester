@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- Removed accidental sample multi-module leftovers so Gradle now runs as a single-module project.
+- Removed the generated `:app:run` "Hello World!" sample task/module path.
+- Added joystick access status text to both HUD and `Controls & Input Status...` dialog.
+- Updated README with Linux `/dev/input/event*` permission guidance and Fedora-specific troubleshooting notes.
+
+### Fixed
+- Added Linux permission diagnostics for unreadable `/dev/input/event*` nodes and surfaced a friendly in-app hint when joystick access likely fails due to permissions.
+
 ## 0.1 Alpha
 
 ### Added
