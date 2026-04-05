@@ -15,17 +15,20 @@
 - Added in-app settings menu with preferred input selection (`Auto/Keyboard/Joystick`).
 - Added `Controls & Input Status...` submenu dialog with bindings and live status.
 - Added HUD debug lines for input mode, keyboard active state, joystick status, and raw axis values.
+- Added Gradle native-runtime wiring for JInput by introducing `extractJinputNatives` to unpack native libraries into `build/jinput-natives` before launch.
 
 ### Changed
 - Updated app/window header text to `Java Joystick Tester (0.1 Alpha)`.
 - Updated Gradle project version to `0.1 Alpha`.
 - Updated README to reflect controls, features, run steps, and known limitations.
 - Refactored input flow so rendering consumes shared state while input is modularized.
+- Updated runtime launch configuration so the `run` task now passes `-Djava.library.path=<project>/build/jinput-natives`.
 
 ### Fixed
 - Fixed keyboard input not being captured reliably by replacing frame-level `KeyListener` usage with Swing key bindings on the render panel (`WHEN_IN_FOCUSED_WINDOW`).
 - Ensured update loop applies shared input state before `ShipState.update(...)` and repaint.
 - Ensured keyboard fallback remains active when joystick is unavailable.
+- Fixed Linux joystick runtime failures (`no jinput-linux64 in java.library.path` and `LinuxEnvironmentPlugin is not supported`) by unpacking and exposing JInput natives during Gradle app execution.
 
 ### Notes
 - Main entry point remains `com.fire.javajoysticktester.Main`.
