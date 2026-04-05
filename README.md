@@ -26,24 +26,34 @@ Menu:
 - `Settings -> Controls & Input Status...`: Shows bindings, active status, detected controllers
 
 ## Joystick support
-Library added:
-- `net.java.jinput:jinput:2.0.10`
-- `net.java.jinput:jinput-platform:2.0.10:natives-all` (runtime natives)
+Dependencies:
+- `implementation("net.java.jinput:jinput:2.0.10")`
+- `runtimeOnly("net.java.jinput:jinput:2.0.10:natives-all")`
 
-Current joystick behavior:
-- Detects connected stick/gamepad/wheel devices
-- Lists controller names
-- Detects Thrustmaster T.16000M by name match (`T.16000` / `T16000`)
-- Reads raw analog/button values for debug display
-- Falls back to keyboard when no joystick is available (or when keyboard is selected)
+Runtime native setup (Gradle):
+- `extractJinputNatives` unpacks native files from the `natives-all` runtime artifact into `build/jinput-natives`.
+- The Gradle `run` task depends on that extraction task.
+- The Gradle `run` task sets `-Djava.library.path=<project>/build/jinput-natives` before launching `Main`.
 
-## Run from IntelliJ
+Why this matters:
+- Java classes from `jinput` can load fine without natives, so the app window can still launch.
+- Joystick backends (like `LinuxEnvironmentPlugin`) require platform native libraries at runtime.
+- If `java.library.path` does not include unpacked JInput natives, joystick discovery fails with errors like `no jinput-linux64 in java.library.path`.
+
+## Run from IntelliJ and Gradle
 You should keep running from `Main`:
 - Class: `com.fire.javajoysticktester.Main`
 
-From terminal:
+Recommended execution modes:
+- Gradle: `./gradlew run`
+- IntelliJ (recommended): enable **Run tests using: Gradle** and **Build and run using: Gradle**, then run the Gradle `run` task.
+
+If you run a plain IntelliJ Application configuration directly (not delegated to Gradle), add this VM option:
+- `-Djava.library.path=$ProjectFileDir$/build/jinput-natives`
+
+and run this once first:
 ```bash
-./gradlew run
+./gradlew extractJinputNatives
 ```
 
 ## Limitations (0.1 Alpha)
