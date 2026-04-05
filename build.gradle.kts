@@ -18,7 +18,7 @@ repositories {
 
 dependencies {
     implementation("net.java.jinput:jinput:2.0.10")
-    runtimeOnly("net.java.jinput:jinput-platform:2.0.10:natives-all")
+    runtimeOnly("net.java.jinput:jinput:2.0.10:natives-all")
 }
 
 application {
