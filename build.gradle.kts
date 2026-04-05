@@ -1,6 +1,6 @@
+import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.tasks.Sync
-import org.gradle.jvm.tasks.Jar
 
 plugins {
     application
@@ -32,7 +32,10 @@ val extractJinputNatives by tasks.registering(Sync::class) {
     description = "Unpacks JInput native libraries from the natives-all runtime artifact."
 
     val runtimeArtifacts = configurations.runtimeClasspath.get().incoming.artifactView {
-        attributes.attribute(Attribute.of("artifactType", String::class.java), Jar.ARTIFACT_TYPE)
+        attributes.attribute(
+            Attribute.of("artifactType", String::class.java),
+            ArtifactTypeDefinition.JAR_TYPE
+        )
         lenient(true)
     }.files
 
