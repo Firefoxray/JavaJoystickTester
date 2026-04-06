@@ -9,6 +9,7 @@ import com.fire.javajoysticktester.input.KeyboardInput;
 import com.fire.javajoysticktester.input.PreferredInputDevice;
 import com.fire.javajoysticktester.model.ShipState;
 import com.fire.javajoysticktester.render.ShipPanel;
+import com.fire.javajoysticktester.update.GitUpdateService;
 
 import javax.swing.ButtonGroup;
 import javax.swing.JFrame;
@@ -18,10 +19,12 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JTextArea;
+import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import java.awt.BorderLayout;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -29,7 +32,8 @@ import java.util.Map;
  * Main application frame.
  */
 public class MainWindow {
-    private static final String APP_TITLE = "Java Joystick Tester (0.1 Alpha)";
+    private static final String APP_VERSION = "0.2 Alpha";
+    private static final String APP_TITLE = "Java Joystick Tester (" + APP_VERSION + ")";
     private static final int WIDTH = 1000;
     private static final int HEIGHT = 700;
     private static final int TARGET_FPS = 60;
@@ -39,6 +43,7 @@ public class MainWindow {
     private final ShipPanel shipPanel;
     private final KeyboardInput keyboardInput;
     private final InputSystem inputSystem;
+    private final GitUpdateService gitUpdateService;
 
     private long lastUpdateNanos;
 
@@ -48,6 +53,7 @@ public class MainWindow {
         shipPanel = new ShipPanel(shipState);
         keyboardInput = new KeyboardInput();
         inputSystem = new InputSystem(keyboardInput, new JoystickInput());
+        gitUpdateService = new GitUpdateService();
 
         keyboardInput.install(shipPanel);
 
@@ -101,14 +107,22 @@ public class MainWindow {
         addAxisBindingMenu(mappingMenu, "Throttle Axis", inputSystem::getThrottleAxis, inputSystem::setThrottleAxis);
 
         JMenu triggerButtonMenu = new JMenu("Trigger Button");
-        ButtonGroup triggerButtons = new ButtonGroup();
-        for (int i = 0; i <= 7; i++) {
-            int index = i;
-            JRadioButtonMenuItem item = new JRadioButtonMenuItem("Button " + i, i == inputSystem.getTriggerButtonIndex());
-            item.addActionListener(e -> inputSystem.setTriggerButtonIndex(index));
-            triggerButtons.add(item);
-            triggerButtonMenu.add(item);
-        }
+        triggerButtonMenu.addMenuListener(new MenuListener() {
+            @Override
+            public void menuSelected(MenuEvent e) {
+                rebuildTriggerButtonMenu(triggerButtonMenu);
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {
+                // no-op
+            }
+
+            @Override
+            public void menuCanceled(MenuEvent e) {
+                // no-op
+            }
+        });
         mappingMenu.add(triggerButtonMenu);
 
         JMenu triggerActionMenu = new JMenu("Trigger Action");
@@ -130,7 +144,79 @@ public class MainWindow {
         settingsMenu.add(controlsItem);
         menuBar.add(settingsMenu);
 
+        JMenu updatesMenu = new JMenu("Updates");
+        JMenuItem checkUpdatesItem = new JMenuItem("Check for Updates...");
+        checkUpdatesItem.addActionListener(e -> checkForUpdatesFromMenu());
+        updatesMenu.add(checkUpdatesItem);
+        menuBar.add(updatesMenu);
+
         return menuBar;
+    }
+
+    private void checkForUpdatesFromMenu() {
+        runAsync("Checking for updates...", () -> {
+            GitUpdateService.CheckResult result = gitUpdateService.checkForUpdates();
+            SwingUtilities.invokeLater(() -> handleUpdateCheckResult(result));
+        });
+    }
+
+    private void handleUpdateCheckResult(GitUpdateService.CheckResult result) {
+        String header = "Branch: " + result.branch() + "\n"
+                + "Commit: " + result.shortCommit() + "\n"
+                + "Status: " + formatStatus(result.status()) + "\n\n";
+
+        if (result.status() == GitUpdateService.UpdateStatus.UPDATE_AVAILABLE) {
+            int choice = JOptionPane.showConfirmDialog(
+                    frame,
+                    header + result.message() + "\n\nUpdate now and restart?",
+                    "Updates",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE
+            );
+
+            if (choice == JOptionPane.YES_OPTION) {
+                runAsync("Updating and restarting...", () -> {
+                    GitUpdateService.UpdateResult updateResult = gitUpdateService.updateAndRestart();
+                    SwingUtilities.invokeLater(() -> {
+                        if (updateResult.success()) {
+                            frame.dispose();
+                            System.exit(0);
+                        } else {
+                            JOptionPane.showMessageDialog(frame, updateResult.message(), "Update failed", JOptionPane.ERROR_MESSAGE);
+                        }
+                    });
+                });
+            }
+            return;
+        }
+
+        int messageType = result.status() == GitUpdateService.UpdateStatus.UNABLE_TO_CHECK
+                ? JOptionPane.WARNING_MESSAGE
+                : JOptionPane.INFORMATION_MESSAGE;
+
+        JOptionPane.showMessageDialog(frame, header + result.message(), "Updates", messageType);
+    }
+
+    private static String formatStatus(GitUpdateService.UpdateStatus status) {
+        return switch (status) {
+            case ALREADY_UP_TO_DATE -> "Already up to date";
+            case UPDATE_AVAILABLE -> "Update available";
+            case WORKING_TREE_DIRTY -> "Working tree has local changes";
+            case UNABLE_TO_CHECK -> "Unable to check for updates";
+        };
+    }
+
+    private void runAsync(String label, Runnable task) {
+        frame.setTitle(APP_TITLE + " - " + label);
+        Thread thread = new Thread(() -> {
+            try {
+                task.run();
+            } finally {
+                SwingUtilities.invokeLater(() -> frame.setTitle(APP_TITLE));
+            }
+        }, "update-check-thread");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private void addAxisBindingMenu(JMenu parent,
@@ -187,10 +273,69 @@ public class MainWindow {
         }
     }
 
+    private void rebuildTriggerButtonMenu(JMenu triggerButtonMenu) {
+        triggerButtonMenu.removeAll();
+        ButtonGroup group = new ButtonGroup();
+
+        List<Integer> indices = extractButtonIndices(inputSystem.getLastJoystickSnapshot());
+        if (indices.isEmpty()) {
+            indices = new ArrayList<>();
+            for (int i = 0; i <= 7; i++) {
+                indices.add(i);
+            }
+        }
+
+        for (Integer index : indices) {
+            int buttonIndex = index;
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem("Button " + buttonIndex, buttonIndex == inputSystem.getTriggerButtonIndex());
+            item.addActionListener(e -> inputSystem.setTriggerButtonIndex(buttonIndex));
+            group.add(item);
+            triggerButtonMenu.add(item);
+        }
+    }
+
+    private static List<Integer> extractButtonIndices(JoystickSnapshot snapshot) {
+        List<Integer> out = new ArrayList<>();
+        for (String key : snapshot.buttons().keySet()) {
+            Integer parsed = parseButtonIndex(key);
+            if (parsed != null && !out.contains(parsed)) {
+                out.add(parsed);
+            }
+        }
+        out.sort(Integer::compareTo);
+        return out;
+    }
+
+    private static Integer parseButtonIndex(String raw) {
+        if (raw == null) {
+            return null;
+        }
+
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (Character.isDigit(c)) {
+                digits.append(c);
+            } else if (digits.length() > 0) {
+                break;
+            }
+        }
+
+        if (digits.length() == 0) {
+            return null;
+        }
+
+        try {
+            return Integer.parseInt(digits.toString());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
     private void showControlsDialog() {
         JoystickSnapshot snapshot = inputSystem.getLastJoystickSnapshot();
         StringBuilder text = new StringBuilder();
-        text.append("Java Joystick Tester (0.1 Alpha)\n\n");
+        text.append("Java Joystick Tester (").append(APP_VERSION).append(")\n\n");
         text.append("Keyboard bindings:\n");
         for (Map.Entry<String, String> binding : KeyboardInput.getBindingDescriptions().entrySet()) {
             text.append(" - ").append(binding.getKey()).append(": ").append(binding.getValue()).append("\n");

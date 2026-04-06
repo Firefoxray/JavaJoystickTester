@@ -1,9 +1,9 @@
-# Java Joystick Tester (0.1 Alpha)
+# Java Joystick Tester (0.2 Alpha)
 
 A Swing/Java2D flight-input sandbox for testing keyboard and joystick controls against a simple ship debug HUD.
 
 ## Version
-Current version: `0.1 Alpha`
+Current version: `0.2 Alpha`
 
 ## What works in this version
 - Main entry point remains `com.fire.javajoysticktester.Main`.
@@ -12,8 +12,8 @@ Current version: `0.1 Alpha`
 - Real-time ship HUD for pitch, yaw, roll, and throttle.
 - Input architecture split into keyboard input, joystick input, and shared input system.
 - Joystick detection and polling via **JInput**.
-- On-screen joystick status (connected device name, access status, T.16000M detection, raw axis values).
-- Settings menu for preferred input device selection, joystick-controller selection, and controls/status view.
+- On-screen joystick status (connected device name, access status, T.16000M detection, raw axis values, and live button state panel by button index).
+- Settings menu for preferred input device selection, joystick-controller selection, controls/status view, and trigger button mapping from detected button indices.
 
 ## Controls
 Keyboard (fallback and explicit mode):
@@ -37,6 +37,22 @@ Menu:
 - Joystick flight input now uses direct Star-Fox-style target control (stick deflection maps directly to ship target pitch/yaw/roll) so steering feels tied to the ship itself.
 - Starfield now flows toward the camera to reinforce forward motion, with speed influenced by throttle.
 - Trigger button mapping supports `NONE`, `BOOST`, or `FIRE_PRIMARY` actions (default trigger button is Button 0).
+- HUD keeps pitch/yaw/roll + throttle readable while a side panel shows per-button pressed states for the active controller.
+- Denser animated starfield and clearer forward ship nose/cockpit cues improve motion readability.
+
+
+## In-app updates
+- Menu path: `Updates -> Check for Updates...`
+- The app checks the **current branch** against its upstream tracking branch (`@{u}`), not a hardcoded branch name.
+- The update dialog shows branch name, current short commit hash, and one of:
+  - already up to date
+  - update available
+  - unable to check for updates
+  - working tree has local changes
+- Auto-update is blocked when uncommitted local changes exist (commit/stash first).
+- If an update is available and you choose **Yes**, the app runs `git pull --ff-only` and attempts to restart the same `Main` entry point.
+- If restart cannot be launched automatically, the app reports the issue and asks you to relaunch manually.
+- Known limitations: requires running from a Git working tree with `git` available and an upstream branch configured; network access is needed to fetch remote updates.
 
 ## Linux joystick permissions (`/dev/input/event*`)
 On Linux, JInput commonly reads joystick/gamepad events through `/dev/input/event*` nodes.
@@ -86,7 +102,7 @@ and run this once first:
 ./gradlew extractJinputNatives
 ```
 
-## Limitations (0.1 Alpha)
+## Limitations (0.2 Alpha)
 - Joystick axis mapping is generic and may vary by hardware.
 - No persistent control remapping UI yet.
 - No hot-plug notifications yet (controllers are polled each frame).
