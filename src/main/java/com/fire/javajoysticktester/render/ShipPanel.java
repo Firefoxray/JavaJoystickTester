@@ -1,5 +1,7 @@
 package com.fire.javajoysticktester.render;
 
+import com.fire.javajoysticktester.AppInfo;
+import com.fire.javajoysticktester.input.InputSystem;
 import com.fire.javajoysticktester.input.JoystickSnapshot;
 import com.fire.javajoysticktester.input.PreferredInputDevice;
 import com.fire.javajoysticktester.model.ShipState;
@@ -53,8 +55,10 @@ public class ShipPanel extends JPanel {
     private boolean keyboardActive;
     private JoystickSnapshot joystickSnapshot = JoystickSnapshot.disconnected(java.util.List.of());
     private String activeInputDescription = "Keyboard";
+    private InputSystem inputSystem;
 
     private long lastStarNanos = System.nanoTime();
+    private long starRespawnCounter = 1009;
 
     public ShipPanel(ShipState shipState) {
         this.shipState = shipState;
@@ -62,11 +66,16 @@ public class ShipPanel extends JPanel {
         setFocusable(true);
     }
 
-    public void updateInputDebug(PreferredInputDevice preferredInputDevice, boolean keyboardActive, JoystickSnapshot joystickSnapshot, String activeInputDescription) {
+    public void updateInputDebug(PreferredInputDevice preferredInputDevice,
+                                 boolean keyboardActive,
+                                 JoystickSnapshot joystickSnapshot,
+                                 String activeInputDescription,
+                                 InputSystem inputSystem) {
         this.preferredInputDevice = preferredInputDevice;
         this.keyboardActive = keyboardActive;
         this.joystickSnapshot = joystickSnapshot;
         this.activeInputDescription = activeInputDescription;
+        this.inputSystem = inputSystem;
     }
 
     @Override
@@ -105,7 +114,8 @@ public class ShipPanel extends JPanel {
         for (double[] star : STAR_FIELD) {
             star[2] -= deltaSec * speed;
             if (star[2] <= 0.08) {
-                resetStar(star, (int) (star[3] * 1000));
+                starRespawnCounter += 7919;
+                resetStar(star, (int) (starRespawnCounter & 0x7FFFFFFF));
             }
         }
     }
@@ -194,7 +204,7 @@ public class ShipPanel extends JPanel {
         int lineHeight = 18;
 
         g2d.setColor(new Color(220, 240, 255));
-        g2d.drawString("Java Joystick Tester (0.3 Alpha)", x, y);
+        g2d.drawString(AppInfo.fullTitle(), x, y);
 
         g2d.setColor(new Color(170, 220, 255));
         g2d.drawString(String.format("Pitch: %7.2f°  (target %7.2f°)", shipState.getPitchDegrees(), shipState.getTargetPitchDegrees()), x, y + lineHeight);
@@ -204,7 +214,7 @@ public class ShipPanel extends JPanel {
 
         g2d.setColor(new Color(130, 190, 235));
         g2d.drawString("Controls: Arrows=Pitch/Yaw, Q/E=Roll, W/S=Throttle", x, y + lineHeight * 6);
-        g2d.drawString("Settings menu: choose input, controller, mapping", x, y + lineHeight * 7);
+        g2d.drawString("Settings: input/mapping/reset + manual full button mapping", x, y + lineHeight * 7);
 
         g2d.drawString("Preferred Input: " + preferredInputDevice + " | Active: " + activeInputDescription, x, y + lineHeight * 8);
         g2d.drawString("Joystick access: " + joystickSnapshot.accessStatus(), x, y + lineHeight * 9);
@@ -231,12 +241,15 @@ public class ShipPanel extends JPanel {
         g2d.setColor(new Color(220, 240, 255));
         g2d.drawString("Controller Buttons", x, y);
 
-        g2d.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+        g2d.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
         String controllerName = joystickSnapshot.connected() ? joystickSnapshot.controllerName() : "No controller";
         g2d.setColor(new Color(160, 210, 245));
-        g2d.drawString(controllerName, x, y + 17);
+        g2d.drawString(clipText(controllerName, 30), x, y + 16);
 
-        List<Integer> buttonIndices = extractButtonIndices(joystickSnapshot.buttons());
+        List<Integer> buttonIndices = inputSystem != null
+                ? inputSystem.getLogicalButtonIndices(joystickSnapshot)
+                : extractButtonIndices(joystickSnapshot.buttons());
+
         if (buttonIndices.isEmpty()) {
             g2d.setColor(new Color(170, 190, 210));
             g2d.drawString("No digital buttons reported.", x, y + 42);
@@ -244,15 +257,17 @@ public class ShipPanel extends JPanel {
         }
 
         int top = y + 30;
-        int cols = 4;
-        int cellWidth = (panelWidth - 24) / cols;
-        int cellHeight = 24;
+        int cols = 5;
+        int gap = 4;
+        int cellWidth = (panelWidth - 24 - (cols - 1) * gap) / cols;
+        int cellHeight = 22;
 
+        g2d.setFont(new Font(Font.MONOSPACED, Font.BOLD, 11));
         for (int i = 0; i < buttonIndices.size(); i++) {
             int index = buttonIndices.get(i);
             int col = i % cols;
             int row = i / cols;
-            int cellX = x + col * cellWidth;
+            int cellX = x + col * (cellWidth + gap);
             int cellY = top + row * (cellHeight + 6);
 
             if (cellY + cellHeight > panelY + panelHeight - 8) {
@@ -261,18 +276,27 @@ public class ShipPanel extends JPanel {
                 break;
             }
 
-            boolean pressed = isButtonIndexPressed(joystickSnapshot.buttons(), index);
+            boolean pressed = inputSystem != null
+                    ? inputSystem.isLogicalButtonPressed(joystickSnapshot, index)
+                    : isButtonIndexPressed(joystickSnapshot.buttons(), index);
             Color fill = pressed ? new Color(70, 200, 120, 210) : new Color(35, 55, 85, 180);
             Color border = pressed ? new Color(150, 255, 180, 230) : new Color(120, 170, 210, 140);
 
             g2d.setColor(fill);
-            g2d.fillRoundRect(cellX, cellY, cellWidth - 8, cellHeight, 8, 8);
+            g2d.fillRoundRect(cellX, cellY, cellWidth, cellHeight, 8, 8);
             g2d.setColor(border);
-            g2d.drawRoundRect(cellX, cellY, cellWidth - 8, cellHeight, 8, 8);
+            g2d.drawRoundRect(cellX, cellY, cellWidth, cellHeight, 8, 8);
 
             g2d.setColor(new Color(235, 245, 255));
-            g2d.drawString("Button " + index, cellX + 6, cellY + 16);
+            g2d.drawString("B" + index, cellX + 7, cellY + 15);
         }
+    }
+
+    private static String clipText(String text, int max) {
+        if (text == null || text.length() <= max) {
+            return text;
+        }
+        return text.substring(0, Math.max(0, max - 1)) + "…";
     }
 
     private static List<Integer> extractButtonIndices(Map<String, Boolean> buttons) {
@@ -345,39 +369,49 @@ public class ShipPanel extends JPanel {
     private static double[][] buildStars() {
         double[][] stars = new double[STAR_COUNT][4];
         for (int i = 0; i < STAR_COUNT; i++) {
-            resetStar(stars[i], i);
+            resetStar(stars[i], i * 4099 + 17);
         }
         return stars;
     }
 
     private static void resetStar(double[] star, int seed) {
-        double nx = (((seed * 73) % 1000) / 999.0) * 2.0 - 1.0;
-        double ny = (((seed * 151 + 37) % 1000) / 999.0) * 2.0 - 1.0;
-        double depth = 0.22 + (((seed * 199 + 11) % 1000) / 999.0) * 1.28;
-        star[0] = nx * 540.0;
-        star[1] = ny * 380.0;
+        long s1 = Integer.toUnsignedLong(seed) * 1664525L + 1013904223L;
+        long s2 = s1 * 1664525L + 1013904223L;
+        long s3 = s2 * 1664525L + 1013904223L;
+
+        double nx = ((s1 & 0xFFFF) / 65535.0) * 2.0 - 1.0;
+        double ny = ((s2 & 0xFFFF) / 65535.0) * 2.0 - 1.0;
+        double depth = 0.22 + ((s3 & 0xFFFF) / 65535.0) * 1.28;
+
+        star[0] = nx * 560.0;
+        star[1] = ny * 400.0;
         star[2] = depth;
         star[3] = seed;
     }
 
-    private static double[] rotateXYZ(double x, double y, double z,
-                                      double pitchDeg, double yawDeg, double rollDeg) {
+    private static double[] rotateXYZ(double x, double y, double z, double pitchDeg, double yawDeg, double rollDeg) {
         double pitch = Math.toRadians(pitchDeg);
         double yaw = Math.toRadians(yawDeg);
         double roll = Math.toRadians(rollDeg);
 
-        double py = y * Math.cos(pitch) - z * Math.sin(pitch);
-        double pz = y * Math.sin(pitch) + z * Math.cos(pitch);
-        double px = x;
+        double cosy = Math.cos(yaw);
+        double siny = Math.sin(yaw);
+        double x1 = x * cosy + z * siny;
+        double y1 = y;
+        double z1 = -x * siny + z * cosy;
 
-        double yx = px * Math.cos(yaw) + pz * Math.sin(yaw);
-        double yz = -px * Math.sin(yaw) + pz * Math.cos(yaw);
-        double yy = py;
+        double cosp = Math.cos(pitch);
+        double sinp = Math.sin(pitch);
+        double x2 = x1;
+        double y2 = y1 * cosp - z1 * sinp;
+        double z2 = y1 * sinp + z1 * cosp;
 
-        double rx = yx * Math.cos(roll) - yy * Math.sin(roll);
-        double ry = yx * Math.sin(roll) + yy * Math.cos(roll);
-        double rz = yz;
+        double cosr = Math.cos(roll);
+        double sinr = Math.sin(roll);
+        double x3 = x2 * cosr - y2 * sinr;
+        double y3 = x2 * sinr + y2 * cosr;
+        double z3 = z2;
 
-        return new double[]{rx, ry, rz};
+        return new double[]{x3, y3, z3};
     }
 }

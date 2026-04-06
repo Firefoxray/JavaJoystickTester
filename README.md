@@ -1,26 +1,26 @@
-# Java Joystick Tester (0.3 Alpha)
+# Java Joystick Tester (0.4 Alpha)
 
 A Swing/Java2D flight-input sandbox for testing keyboard and joystick controls against a ship HUD.
 
 ## Version
-Current version: `0.3 Alpha`
+Current version: `0.4 Alpha`
 
 ## What works in this version
 - Main entry point remains `com.fire.javajoysticktester.Main`.
 - Single-module Gradle application project (no sample `:app` module).
 - Keyboard fallback controls remain active and unchanged.
 - Joystick detection/polling via **JInput** with preferred-device + manual-controller selection.
-- Joystick axis mapping (pitch/yaw/roll/throttle), trigger action mapping, and new invert toggles for pitch/yaw/roll/throttle.
-- HUD + side panel showing live axis values, controller status, and button states.
-- T.16000M button display uses normalized numeric button IDs when available (targeting `Button 0`..`Button 15` layout).
-- Improved starfield density and motion streaking for stronger forward-flight feel.
+- Joystick axis mapping (pitch/yaw/roll/throttle), trigger action mapping, and axis inversion toggles.
+- **Manual full button mapping flow** (`Settings -> Joystick Mapping -> Map Buttons Manually...`) that walks `Button 0..N` and saves per-controller physical mappings.
+- **Reset to defaults** (`Settings -> Reset to Defaults...`) with confirmation and config wipe.
+- **Persistent config file** auto-load/save at `~/.java-joystick-tester/config.properties`.
+- HUD + side panel showing live axis values, controller status, and compact button states.
+- Starfield forward-flight background with respawn logic fixed to avoid long-term bottom-right drift/collapse.
 - `Extras` menu includes update checks and desktop launcher installation.
 
 ## Run options
 - Gradle: `./gradlew run`
-- Launcher script (new): `./run_joystick_tester.sh`
-
-The launcher script is suitable as a desktop-entry target and always runs from the project directory.
+- Launcher script: `./run_joystick_tester.sh`
 
 ## Menu overview
 ### Settings
@@ -28,35 +28,54 @@ The launcher script is suitable as a desktop-entry target and always runs from t
 - `Joystick Controller`: auto-select (prefer T.16000M) or manually pin a detected device
 - `Joystick Mapping`
   - Pitch/Yaw/Roll/Throttle axis selection
-  - **Invert Axes**: invert Pitch, Yaw, Roll, Throttle
-  - Trigger button selection (from detected button indices)
-  - Trigger action (`NONE`, `BOOST`, `FIRE_PRIMARY`)
-- `Controls & Input Status...`: shows active mode, mappings, inversion state, and controller list
+  - `Invert Axes` submenu
+  - Trigger button selection and trigger action selection
+  - `Map Buttons Manually...` (step-by-step physical button capture)
+  - `Clear Manual Button Mapping`
+- `Controls & Input Status...`
+  - active input/controller
+  - mappings and invert state
+  - manual button map for active controller
+  - axis meaning notes (`Z` vs `RZ`)
+  - config file location
+- `Reset to Defaults...` clears in-memory settings and saved config values after confirmation
 
 ### Extras
 - `Check for Updates...`
 - `Install Desktop Launcher`
 
-## Desktop launcher installation
-Using `Extras -> Install Desktop Launcher` on Linux creates:
-- `~/.local/share/applications/java-joystick-tester.desktop`
-- `~/.local/share/java-joystick-tester/run_joystick_tester.sh`
-- `~/.local/share/icons/java-joystick-tester/icon1.png`
+## Manual button mapping details
+Manual mapping is intended as the source of truth when device-reported button identifiers are unreliable.
 
-The launcher uses the included `images/icon1.png` and starts the app through Gradle.
+Flow:
+1. Open `Settings -> Joystick Mapping -> Map Buttons Manually...`
+2. The app determines the active controller's button count.
+3. It prompts through logical `Button 0`, `Button 1`, ... up to `Button N`.
+4. For each prompt, hold the desired physical button and click OK.
+5. Mapping is saved per controller name and reused on restart.
 
-## T.16000M button numbering note
-JInput sometimes reports generic/raw component names depending on platform/backend.
-This build normalizes button labels using numeric identifiers where available and falls back to component order when not.
+This is especially useful for T.16000M layouts where backend button identifiers may vary by OS.
 
-- On typical T.16000M setups, this should show all 16 buttons (`Button 0`..`Button 15`).
-- If your OS/backend exposes non-numeric names only, fallback ordering may still need one-time manual trigger-button selection in the menu.
+## Z vs RZ axis note
+JInput axis names vary by platform/backend, but this app now labels options with likely flight-stick meaning:
+- `RZ` is commonly stick twist/yaw on devices like the T.16000M.
+- `Z` is commonly throttle/slider on many devices.
+
+Always verify with live `Raw axes` HUD readout, since exact labeling can differ.
+
+## Config persistence
+Settings are saved to:
+- `~/.java-joystick-tester/config.properties`
+
+Persisted values include preferred input mode, selected controller, axis mappings, invert toggles,
+trigger mapping/action, and manual button mapping data.
+
+If config is missing or invalid, the app safely falls back to defaults.
 
 ## Linux joystick permissions (`/dev/input/event*`)
 On Linux, JInput commonly reads joystick/gamepad events through `/dev/input/event*` nodes.
 
 If these are unreadable, joystick polling can fail with `Permission denied (13)` even though the app launches normally.
-
 The app surfaces joystick access status in the HUD and in `Controls & Input Status...`.
 
 ## Joystick support dependencies
@@ -65,15 +84,10 @@ The app surfaces joystick access status in the HUD and in `Controls & Input Stat
 
 The Gradle `run` task extracts JInput natives into `build/jinput-natives` and sets `java.library.path` accordingly.
 
-## Limitations (0.3 Alpha)
-- No persistent remapping profile save/load yet.
-- No hot-plug notification UI yet (controllers are polled each frame).
-- Exact physical-button-to-index mapping can vary by OS/JInput backend even when numeric labels are available.
-
 ## Project layout
 - `src/main/java/com/fire/javajoysticktester/Main.java` – app entry point
-- `src/main/java/com/fire/javajoysticktester/ui/...` – frame/menu/update loop + launcher install
-- `src/main/java/com/fire/javajoysticktester/render/...` – HUD, ship, and starfield rendering
+- `src/main/java/com/fire/javajoysticktester/ui/...` – frame/menu/update loop/config/update flow
+- `src/main/java/com/fire/javajoysticktester/render/...` – HUD, ship, starfield, button panel rendering
 - `src/main/java/com/fire/javajoysticktester/model/...` – mutable ship model/state
 - `src/main/java/com/fire/javajoysticktester/input/...` – keyboard, joystick, and shared input system
 

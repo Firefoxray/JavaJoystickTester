@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.fire"
-version = "0.3 Alpha"
+version = "0.4 Alpha"
 
 java {
     toolchain {

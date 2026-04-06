@@ -1,6 +1,23 @@
 # Changelog
 
 ## Unreleased
+- No unreleased entries at this time.
+
+## 0.4 Alpha
+
+### Added
+- Added persistent settings/config support via local properties file at `~/.java-joystick-tester/config.properties`, including graceful fallback to defaults on missing/corrupt config.
+- Added full manual button mapping flow (`Settings -> Joystick Mapping -> Map Buttons Manually...`) for step-by-step physical button assignment (`Button 0..N`) and per-controller saved mappings.
+- Added `Settings -> Reset to Defaults...` with confirmation dialog to clear in-memory and persisted settings.
+- Added axis clarification notes for `Z` vs `RZ` in controls/status text and improved axis option labels for flight-stick usage.
+
+### Changed
+- Bumped project/app version references from `0.3 Alpha` to `0.4 Alpha` across `VERSION`, Gradle metadata, README, window title, HUD header, and status text.
+- Updated button panel rendering to compact labels (`B0`, `B1`, ...) and tighter layout/font sizing so labels fit cleanly inside cells without overflow.
+- Manual button mappings are now treated as source-of-truth for logical button number behavior when configured.
+
+### Fixed
+- Fixed long-term starfield drift/collapse toward the bottom-right by updating respawn seeding/randomization so star distribution remains stable over time.
 
 ## 0.3 Alpha
 
