@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Main application frame.
@@ -143,9 +142,31 @@ public class MainWindow {
             }
         });
         mappingMenu.add(triggerButtonMenu);
-        JMenuItem quickTriggerMapItem = new JMenuItem("Listen and Set Trigger Button...");
-        quickTriggerMapItem.addActionListener(e -> remapTriggerButton());
+        JMenuItem quickTriggerMapItem = new JMenuItem("Remap Trigger Button...");
+        quickTriggerMapItem.addActionListener(e -> startSingleButtonRemap("Trigger", inputSystem.getTriggerButtonIndex(), inputSystem::setTriggerButtonIndex));
         mappingMenu.add(quickTriggerMapItem);
+
+        JMenu boostButtonMenu = new JMenu("Boost Button");
+        boostButtonMenu.addMenuListener(new MenuListener() {
+            @Override
+            public void menuSelected(MenuEvent e) {
+                rebuildBoostButtonMenu(boostButtonMenu);
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {
+                // no-op
+            }
+
+            @Override
+            public void menuCanceled(MenuEvent e) {
+                // no-op
+            }
+        });
+        mappingMenu.add(boostButtonMenu);
+        JMenuItem quickBoostMapItem = new JMenuItem("Remap Boost Button...");
+        quickBoostMapItem.addActionListener(e -> startSingleButtonRemap("Boost", inputSystem.getBoostButtonIndex(), inputSystem::setBoostButtonIndex));
+        mappingMenu.add(quickBoostMapItem);
 
         JMenu triggerActionMenu = new JMenu("Trigger Action");
         ButtonGroup triggerActions = new ButtonGroup();
@@ -157,8 +178,24 @@ public class MainWindow {
         }
         mappingMenu.add(triggerActionMenu);
 
-        JMenuItem manualMapButtonsItem = new JMenuItem("Fast Remap All Buttons...");
-        manualMapButtonsItem.addActionListener(e -> runManualButtonMapping());
+        JMenu manualMapButtonsItem = new JMenu("Remap Logical Buttons");
+        rebuildPerButtonRemapMenu(manualMapButtonsItem);
+        manualMapButtonsItem.addMenuListener(new MenuListener() {
+            @Override
+            public void menuSelected(MenuEvent e) {
+                rebuildPerButtonRemapMenu(manualMapButtonsItem);
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {
+                // no-op
+            }
+
+            @Override
+            public void menuCanceled(MenuEvent e) {
+                // no-op
+            }
+        });
         mappingMenu.addSeparator();
         mappingMenu.add(manualMapButtonsItem);
 
@@ -347,15 +384,7 @@ public class MainWindow {
         triggerButtonMenu.removeAll();
         ButtonGroup group = new ButtonGroup();
 
-        JoystickSnapshot snapshot = inputSystem.getLastJoystickSnapshot();
-        List<Integer> indices = inputSystem.getLogicalButtonIndices(snapshot);
-        if (indices.isEmpty()) {
-            indices = new ArrayList<>();
-            for (int i = 0; i <= 15; i++) {
-                indices.add(i);
-            }
-        }
-
+        List<Integer> indices = inputSystem.getLogicalButtonIndices(inputSystem.getLastJoystickSnapshot());
         for (Integer index : indices) {
             int buttonIndex = index;
             JRadioButtonMenuItem item = new JRadioButtonMenuItem("Button " + buttonIndex, buttonIndex == inputSystem.getTriggerButtonIndex());
@@ -365,161 +394,71 @@ public class MainWindow {
         }
     }
 
-    private void runManualButtonMapping() {
+    private void rebuildBoostButtonMenu(JMenu boostButtonMenu) {
+        boostButtonMenu.removeAll();
+        ButtonGroup group = new ButtonGroup();
+
+        List<Integer> indices = inputSystem.getLogicalButtonIndices(inputSystem.getLastJoystickSnapshot());
+        for (Integer index : indices) {
+            int buttonIndex = index;
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem("Button " + buttonIndex, buttonIndex == inputSystem.getBoostButtonIndex());
+            item.addActionListener(e -> inputSystem.setBoostButtonIndex(buttonIndex));
+            group.add(item);
+            boostButtonMenu.add(item);
+        }
+    }
+
+    private void rebuildPerButtonRemapMenu(JMenu remapMenu) {
+        remapMenu.removeAll();
+        for (int logicalButton = 0; logicalButton < 16; logicalButton++) {
+            int logical = logicalButton;
+            JMenuItem item = new JMenuItem("Remap Logical Button " + logical + "...");
+            item.addActionListener(e -> startPerLogicalRemap(logical));
+            remapMenu.add(item);
+        }
+    }
+
+    private void startPerLogicalRemap(int logicalButton) {
+        startSingleButtonRemap("Logical Button " + logicalButton, logicalButton, selectedLogical -> {
+            JoystickSnapshot snapshot = inputSystem.getLastJoystickSnapshot();
+            if (!snapshot.connected()) {
+                return;
+            }
+            Map<Integer, String> existing = new LinkedHashMap<>(inputSystem.getManualMappingForController(snapshot.controllerName()));
+            String physicalKey = "Button " + selectedLogical;
+            existing.put(logicalButton, physicalKey);
+            inputSystem.setManualMappingForController(snapshot.controllerName(), existing);
+        });
+    }
+
+    private void startSingleButtonRemap(String mappingName, int logicalButtonPrompt, java.util.function.IntConsumer resultConsumer) {
         JoystickSnapshot snapshot = inputSystem.getLastJoystickSnapshot();
         if (!snapshot.connected()) {
             JOptionPane.showMessageDialog(frame,
-                    "Connect/select a joystick first, then open manual mapping.",
-                    "Manual Button Mapping",
+                    "Connect/select a joystick first.",
+                    mappingName + " Remap",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        if (snapshot.buttons().isEmpty()) {
-            JOptionPane.showMessageDialog(frame,
-                    "No digital buttons were reported by the active controller.",
-                    "Manual Button Mapping",
-                    JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        int count = snapshot.buttons().size();
-        int startChoice = JOptionPane.showConfirmDialog(
-                frame,
-                "Manual mapping for: " + snapshot.controllerName() + "\n"
-                        + "This will prompt from Button 0 to Button " + (count - 1) + ".\n"
-                        + "Each step listens and auto-captures the next pressed button.\n"
-                        + "Use Cancel/Esc in the listening dialog to stop.",
-                "Manual Button Mapping",
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.QUESTION_MESSAGE
-        );
-
-        if (startChoice != JOptionPane.OK_OPTION) {
-            return;
-        }
-
-        Map<Integer, String> mapped = new LinkedHashMap<>();
-        for (int logical = 0; logical < count; logical++) {
-            String selectedKey = captureButtonKeyForStep(logical);
-            if (selectedKey == null) {
-                int retry = JOptionPane.showConfirmDialog(
-                        frame,
-                        "No new pressed button detected for Button " + logical + ". Retry this step?",
-                        "Map Button " + logical,
-                        JOptionPane.YES_NO_CANCEL_OPTION,
-                        JOptionPane.WARNING_MESSAGE
-                );
-                if (retry == JOptionPane.YES_OPTION) {
-                    logical--;
-                } else if (retry == JOptionPane.CANCEL_OPTION) {
-                    break;
-                }
-                continue;
-            }
-
-            mapped.put(logical, selectedKey);
-        }
-
-        if (mapped.isEmpty()) {
-            JOptionPane.showMessageDialog(frame,
-                    "No button mapping changes were saved.",
-                    "Manual Button Mapping",
-                    JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-
-        inputSystem.setManualMappingForController(snapshot.controllerName(), mapped);
-        JOptionPane.showMessageDialog(frame,
-                "Saved " + mapped.size() + " button mappings for controller:\n" + snapshot.controllerName(),
-                "Manual Button Mapping",
-                JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    private String captureButtonKeyForStep(int logical) {
-        waitForButtonsToRelease(900);
-        List<String> previousPressed = pressedButtonKeys(inputSystem.pollJoystickSnapshotNow());
-        long deadlineMillis = System.currentTimeMillis() + 7000;
-        AtomicBoolean cancelled = new AtomicBoolean(false);
-        javax.swing.JDialog listeningDialog = buildListeningDialog(logical, cancelled);
-        SwingUtilities.invokeLater(() -> listeningDialog.setVisible(true));
-
-        while (System.currentTimeMillis() < deadlineMillis) {
-            if (cancelled.get()) {
-                listeningDialog.dispose();
-                return null;
-            }
-            JoystickSnapshot live = inputSystem.pollJoystickSnapshotNow();
-            List<String> pressed = pressedButtonKeys(live);
-            List<String> newlyPressed = new ArrayList<>();
-            for (String key : pressed) {
-                if (!previousPressed.contains(key)) {
-                    newlyPressed.add(key);
-                }
-            }
-
-            if (!newlyPressed.isEmpty()) {
-                listeningDialog.dispose();
-                if (newlyPressed.size() == 1) {
-                    return newlyPressed.getFirst();
-                }
-                Object selected = JOptionPane.showInputDialog(
-                        frame,
-                        "Multiple buttons detected for Button " + logical + ". Choose one:",
-                        "Map Button " + logical,
-                        JOptionPane.QUESTION_MESSAGE,
-                        null,
-                        newlyPressed.toArray(),
-                        newlyPressed.getFirst()
-                );
-                return selected == null ? null : selected.toString();
-            }
-            previousPressed = pressed;
-
-            try {
-                Thread.sleep(30L);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                listeningDialog.dispose();
-                return null;
-            }
-        }
-
-        listeningDialog.dispose();
-        return null;
-    }
-
-    private void waitForButtonsToRelease(long timeoutMs) {
-        long deadline = System.currentTimeMillis() + Math.max(100, timeoutMs);
-        while (System.currentTimeMillis() < deadline) {
-            JoystickSnapshot snapshot = inputSystem.pollJoystickSnapshotNow();
-            if (pressedButtonKeys(snapshot).isEmpty()) {
-                return;
-            }
-            try {
-                Thread.sleep(25L);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-    }
-
-    private javax.swing.JDialog buildListeningDialog(int logical, AtomicBoolean cancelled) {
-        javax.swing.JDialog dialog = new javax.swing.JDialog(frame, "Listening for Button " + logical, Dialog.ModalityType.MODELESS);
+        javax.swing.JDialog dialog = new javax.swing.JDialog(frame, "Listening: " + mappingName, Dialog.ModalityType.MODELESS);
         dialog.setLayout(new BorderLayout(8, 8));
 
-        javax.swing.JLabel label = new javax.swing.JLabel("Press the physical button for logical Button " + logical + "...");
+        javax.swing.JLabel label = new javax.swing.JLabel("Press the physical button for Button " + logicalButtonPrompt + "...");
         label.setBorder(javax.swing.BorderFactory.createEmptyBorder(12, 12, 0, 12));
         dialog.add(label, BorderLayout.NORTH);
 
-        javax.swing.JLabel hint = new javax.swing.JLabel("Auto-detecting next newly pressed button (Esc/Cancel to stop)");
+        javax.swing.JLabel hint = new javax.swing.JLabel("Capturing only the next newly pressed button (Esc/Cancel to stop)");
         hint.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 12, 4, 12));
         dialog.add(hint, BorderLayout.CENTER);
 
+        final java.util.Set<String> previousPressed = new java.util.HashSet<>(pressedButtonKeys(inputSystem.pollJoystickSnapshotNow()));
+        final long deadlineMillis = System.currentTimeMillis() + 8000;
+        final javax.swing.Timer pollTimer = new Timer(35, null);
+
         javax.swing.JButton cancelButton = new javax.swing.JButton("Cancel");
         cancelButton.addActionListener(e -> {
-            cancelled.set(true);
+            pollTimer.stop();
             dialog.dispose();
         });
         javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -528,7 +467,7 @@ public class MainWindow {
 
         dialog.getRootPane().registerKeyboardAction(
                 e -> {
-                    cancelled.set(true);
+                    pollTimer.stop();
                     dialog.dispose();
                 },
                 javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
@@ -537,31 +476,39 @@ public class MainWindow {
         dialog.pack();
         dialog.setResizable(false);
         dialog.setLocationRelativeTo(frame);
-        return dialog;
-    }
 
-    private void remapTriggerButton() {
-        JoystickSnapshot snapshot = inputSystem.getLastJoystickSnapshot();
-        if (!snapshot.connected()) {
-            JOptionPane.showMessageDialog(frame,
-                    "Connect/select a joystick first.",
-                    "Trigger Remap",
-                    JOptionPane.WARNING_MESSAGE);
-            return;
-        }
+        pollTimer.addActionListener(e -> {
+            if (System.currentTimeMillis() >= deadlineMillis) {
+                pollTimer.stop();
+                dialog.dispose();
+                JOptionPane.showMessageDialog(frame,
+                        "No button press detected in time.",
+                        mappingName + " Remap",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
 
-        JoystickSnapshot liveSnapshot = inputSystem.pollJoystickSnapshotNow();
-        String selectedKey = captureButtonKeyForStep(inputSystem.getTriggerButtonIndex());
-        Integer detectedIndex = inputSystem.resolveLogicalButtonForPhysicalKey(liveSnapshot, selectedKey);
-        if (detectedIndex == null) {
-            return;
-        }
-
-        inputSystem.setTriggerButtonIndex(detectedIndex);
-        JOptionPane.showMessageDialog(frame,
-                "Trigger remapped to Button " + detectedIndex + " (" + selectedKey + ").",
-                "Trigger Remap",
-                JOptionPane.INFORMATION_MESSAGE);
+            JoystickSnapshot live = inputSystem.pollJoystickSnapshotNow();
+            for (String key : pressedButtonKeys(live)) {
+                if (!previousPressed.contains(key)) {
+                    Integer detectedLogical = inputSystem.resolveLogicalButtonForPhysicalKey(live, key);
+                    if (detectedLogical != null) {
+                        pollTimer.stop();
+                        dialog.dispose();
+                        resultConsumer.accept(detectedLogical);
+                        JOptionPane.showMessageDialog(frame,
+                                mappingName + " mapped to logical Button " + detectedLogical + " (" + key + ").",
+                                mappingName + " Remap",
+                                JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
+                }
+            }
+            previousPressed.clear();
+            previousPressed.addAll(pressedButtonKeys(live));
+        });
+        pollTimer.start();
+        dialog.setVisible(true);
     }
 
     private static List<String> pressedButtonKeys(JoystickSnapshot snapshot) {
@@ -657,6 +604,7 @@ public class MainWindow {
                 .append(inputSystem.isInvertThrottle() ? " (inverted)" : "").append("\n");
         text.append(" - Trigger: Button ").append(inputSystem.getTriggerButtonIndex())
                 .append(" -> ").append(inputSystem.getTriggerButtonAction()).append("\n");
+        text.append(" - Boost button: Button ").append(inputSystem.getBoostButtonIndex()).append("\n");
         text.append(" - Debug mode: ").append(inputSystem.isDebugModeEnabled() ? "ON" : "OFF").append("\n");
         text.append(" - Plane mode: ").append(inputSystem.isSolidPlaneEnabled() ? "Solid retro fill + wireframe" : "Wireframe").append("\n");
 

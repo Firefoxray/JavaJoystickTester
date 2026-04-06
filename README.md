@@ -1,26 +1,25 @@
-# Java Joystick Tester (0.6)
+# Java Joystick Tester (0.7)
 
 A Swing/Java2D flight-input sandbox for testing keyboard and joystick controls against a ship HUD.
 
 ## Version
-Current version: `0.6`
+Current version: `0.7`
 
 ## What works in this version
 - Main entry point remains `com.fire.javajoysticktester.Main`.
 - Single-module Gradle application project (no sample `:app` module).
 - Keyboard fallback controls remain active and unchanged.
 - Joystick detection/polling via **JInput** with preferred-device + manual-controller selection.
-- Joystick axis mapping (pitch/yaw/roll/throttle), trigger action mapping, axis inversion toggles, and clearer flight-meaning labels.
-- **Reliable fast button remapping** (`Settings -> Joystick Mapping -> Fast Remap All Buttons...`) with release-aware next-press capture.
-- **Quick trigger remap** (`Listen and Set Trigger Button...`) that resolves through manual mappings when present.
-- **Persistent config file** auto-load/save at `~/.java-joystick-tester/config.properties` including visual toggles.
+- Joystick axis mapping (pitch/yaw/roll/throttle), trigger mapping/action, dedicated boost button mapping, and axis inversion toggles.
+- **Per-button remapping for all 16 logical buttons** (`Settings -> Joystick Mapping -> Remap Logical Buttons`) with one-button-at-a-time capture.
+- **Simple single-button remap actions** for Trigger and Boost (`Remap Trigger Button...`, `Remap Boost Button...`).
+- **Persistent config file** auto-load/save at `~/.java-joystick-tester/config.properties` including button maps + visual toggles.
 - **Reset to defaults** (`Settings -> Reset to Defaults...`) with confirmation and config wipe/rewrite.
-- HUD + side panel showing live axis values, controller status, speed (MPH), and compact logical button states.
-- Motion-reactive starfield with improved diagonal direction behavior and stronger boost streaking.
-- `BOOST` now adds **+500 MPH** while held, with a clear HUD flag and visual speed-up effect.
-- `Settings -> Debug Mode` toggle with HUD debug flag, wireframe-default behavior in debug, and front/back ship labels in debug mode.
-- Normal mode defaults to solid retro fill + wireframe for readability.
-- FIRE_PRIMARY red projectile/light effect now originates from the ship nose/front while held.
+- HUD + side panel showing live axis values, controller status, speed (MPH), and clean logical button states (`B0..B15`).
+- Rebalanced motion-reactive starfield with toned-down turn/parallax behavior while preserving forward feel.
+- Ship render orientation flipped so the craft flies away from camera (back facing viewer), with FIRE_PRIMARY still emitted from ship front/nose.
+- `BOOST` default mapping is logical `Button 1` (editable in Joystick Mapping menu).
+- `Settings -> Debug Mode` retains FRONT/BACK orientation labels for easy direction checks.
 - `Extras` menu includes update checks and desktop launcher installation.
 
 ## Run options
@@ -34,9 +33,10 @@ Current version: `0.6`
 - `Joystick Mapping`
   - Pitch/Yaw/Roll/Throttle mapping with explicit flight meanings
   - `Invert Axes` submenu
-  - Trigger button selection and trigger action selection
-  - `Listen and Set Trigger Button...` (instant next-button capture)
-  - `Fast Remap All Buttons...` (full auto-listen mapping pass)
+  - Trigger button selection + trigger action selection
+  - Boost button selection
+  - `Remap Trigger Button...` and `Remap Boost Button...`
+  - `Remap Logical Buttons` (all 16 logical buttons, remapped individually)
   - `Clear Manual Button Mapping`
 - `Debug Mode` (wireframe-default + debug overlays)
 - `Controls & Input Status...`
@@ -61,7 +61,7 @@ Settings are saved to:
 - `~/.java-joystick-tester/config.properties`
 
 Persisted values include preferred input mode, selected controller, axis mappings, invert toggles,
-trigger mapping/action, manual button mapping data, debug mode, and visual toggles.
+trigger mapping/action, dedicated boost button mapping, manual button mapping data, debug mode, and visual toggles.
 
 ## Joystick support dependencies
 - `implementation("net.java.jinput:jinput:2.0.10")`

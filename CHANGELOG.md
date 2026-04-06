@@ -3,6 +3,24 @@
 ## Unreleased
 - No unreleased entries at this time.
 
+## 0.7
+
+### Added
+- Added per-button remap UX for all 16 logical joystick buttons via `Settings -> Joystick Mapping -> Remap Logical Buttons`, where each logical button is remapped one-at-a-time from the next physical press only.
+- Added dedicated boost button mapping controls (`Boost Button` selector + `Remap Boost Button...`) with default logical mapping set to `Button 1`.
+
+### Changed
+- Bumped project/app version references from `0.6` to `0.7` across `VERSION`, Gradle metadata, README, window title, HUD text, and shared app constants.
+- Rebalanced starfield movement so forward motion remains strong while yaw/pitch/roll turn-parallax is toned down and less exaggerated.
+- Replaced the broken full-sequence "remap all" flow with responsive per-button remap actions to avoid UI lock-ups.
+- Updated logical button presentation to always provide a stable `B0..B15` logical set for mapping/selection workflows.
+- Flipped ship render orientation so the craft visually flies away from the camera (back facing viewer).
+
+### Fixed
+- Fixed duplicate-looking logical button labels (`B0, B0` / `B1, 1`-style confusion) by normalizing displayed labels and only showing mapping arrows when logical/physical indices differ.
+- Kept FIRE_PRIMARY/projectile origin on the ship front/nose after orientation changes.
+- Preserved manual button mapping as source-of-truth for trigger/boost logical button behavior when mappings are present.
+
 ## 0.6
 
 ### Added

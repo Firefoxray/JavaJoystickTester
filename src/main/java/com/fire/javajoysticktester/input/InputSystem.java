@@ -36,6 +36,7 @@ public class InputSystem {
     private boolean invertRoll;
     private boolean invertThrottle;
     private int triggerButtonIndex = 0;
+    private int boostButtonIndex = 1;
     private JoystickButtonAction triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
     private boolean solidPlaneEnabled = true;
     private boolean debugModeEnabled;
@@ -225,6 +226,15 @@ public class InputSystem {
         onSettingsChanged();
     }
 
+    public int getBoostButtonIndex() {
+        return boostButtonIndex;
+    }
+
+    public void setBoostButtonIndex(int boostButtonIndex) {
+        this.boostButtonIndex = Math.max(0, boostButtonIndex);
+        onSettingsChanged();
+    }
+
     public JoystickButtonAction getTriggerButtonAction() {
         return triggerButtonAction;
     }
@@ -296,15 +306,11 @@ public class InputSystem {
     }
 
     public List<Integer> getLogicalButtonIndices(JoystickSnapshot snapshot) {
-        List<Integer> fromSnapshot = extractButtonIndices(snapshot.buttons());
-        Map<Integer, String> mapped = getManualMappingForController(snapshot.controllerName());
-        for (Integer idx : mapped.keySet()) {
-            if (!fromSnapshot.contains(idx)) {
-                fromSnapshot.add(idx);
-            }
+        List<Integer> logicalButtons = new ArrayList<>();
+        for (int i = 0; i < 16; i++) {
+            logicalButtons.add(i);
         }
-        fromSnapshot.sort(Integer::compareTo);
-        return fromSnapshot;
+        return logicalButtons;
     }
 
     public boolean isLogicalButtonPressed(JoystickSnapshot snapshot, int targetButtonIndex) {
@@ -319,8 +325,10 @@ public class InputSystem {
     public String getLogicalButtonLabel(JoystickSnapshot snapshot, int targetButtonIndex) {
         Map<Integer, String> mapping = getManualMappingForController(snapshot.controllerName());
         String mappedKey = mapping.get(targetButtonIndex);
-        if (mappedKey != null && !mappedKey.isBlank()) {
-            return "B" + targetButtonIndex + "←" + mappedKey.replace("Button ", "B");
+        Integer mappedPhysicalIndex = parseButtonIndex(mappedKey);
+        if (mappedKey != null && !mappedKey.isBlank() && (mappedPhysicalIndex == null || mappedPhysicalIndex != targetButtonIndex)) {
+            String normalizedMapped = mappedPhysicalIndex == null ? mappedKey : "B" + mappedPhysicalIndex;
+            return "B" + targetButtonIndex + "←" + normalizedMapped;
         }
         return "B" + targetButtonIndex;
     }
@@ -353,6 +361,7 @@ public class InputSystem {
         invertThrottle = false;
 
         triggerButtonIndex = 0;
+        boostButtonIndex = 1;
         triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
         solidPlaneEnabled = true;
         debugModeEnabled = false;
@@ -427,10 +436,14 @@ public class InputSystem {
         }
 
         boolean triggerPressed = isLogicalButtonPressed(snapshot, triggerButtonIndex);
+        boolean boostPressed = isLogicalButtonPressed(snapshot, boostButtonIndex);
         if (triggerPressed) {
             applyTriggerAction(shipState, deltaTimeSec);
             firePrimaryActive = triggerButtonAction == JoystickButtonAction.FIRE_PRIMARY;
             boostActive = triggerButtonAction == JoystickButtonAction.BOOST;
+        }
+        if (boostPressed) {
+            boostActive = true;
         }
     }
 

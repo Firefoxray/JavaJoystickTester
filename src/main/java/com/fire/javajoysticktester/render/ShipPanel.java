@@ -24,6 +24,7 @@ import java.util.StringJoiner;
  * Rendering surface.
  */
 public class ShipPanel extends JPanel {
+    private static final double RENDER_YAW_OFFSET_DEG = 180.0;
     private static final double[][] SHIP_VERTICES = {
             {0.00, 0.00, 2.55},
             {-0.35, 0.12, 0.90},
@@ -133,18 +134,18 @@ public class ShipPanel extends JPanel {
         double deltaSec = Math.max(0.0, (now - lastStarNanos) / 1_000_000_000.0);
         lastStarNanos = now;
 
-        double yawDelta = shortestAngleDelta(lastYawDegrees, shipState.getYawDegrees());
-        double pitchDelta = shortestAngleDelta(lastPitchDegrees, shipState.getPitchDegrees());
-        double rollDelta = shortestAngleDelta(lastRollDegrees, shipState.getRollDegrees());
+        double yawDelta = clamp(shortestAngleDelta(lastYawDegrees, shipState.getYawDegrees()), -3.0, 3.0);
+        double pitchDelta = clamp(shortestAngleDelta(lastPitchDegrees, shipState.getPitchDegrees()), -3.0, 3.0);
+        double rollDelta = clamp(shortestAngleDelta(lastRollDegrees, shipState.getRollDegrees()), -3.0, 3.0);
         lastYawDegrees = shipState.getYawDegrees();
         lastPitchDegrees = shipState.getPitchDegrees();
         lastRollDegrees = shipState.getRollDegrees();
 
-        double boostMultiplier = boostActive ? 2.6 : 1.0;
-        double speed = (0.7 + shipState.getThrottle() * 3.8) * boostMultiplier;
-        double yawShift = yawDelta * 165.0;
-        double pitchShift = pitchDelta * 150.0;
-        double rollShift = rollDelta * 80.0;
+        double boostMultiplier = boostActive ? 2.2 : 1.0;
+        double speed = (0.82 + shipState.getThrottle() * 3.25) * boostMultiplier;
+        double yawShift = yawDelta * 52.0;
+        double pitchShift = pitchDelta * 46.0;
+        double rollShift = rollDelta * 24.0;
         for (double[] star : STAR_FIELD) {
             star[2] -= deltaSec * speed;
             star[0] -= yawShift + rollShift;
@@ -212,7 +213,7 @@ public class ShipPanel extends JPanel {
             double[] p = SHIP_VERTICES[i];
             double[] rotated = rotateXYZ(p[0], p[1], p[2],
                     shipState.getPitchDegrees(),
-                    shipState.getYawDegrees(),
+                    shipState.getYawDegrees() + RENDER_YAW_OFFSET_DEG,
                     shipState.getRollDegrees());
 
             double cameraDistance = 7.4;
@@ -251,7 +252,7 @@ public class ShipPanel extends JPanel {
         if (firePrimaryActive) {
             double[] forward = rotateXYZ(0.0, 0.0, 1.0,
                     shipState.getPitchDegrees(),
-                    shipState.getYawDegrees(),
+                    shipState.getYawDegrees() + RENDER_YAW_OFFSET_DEG,
                     shipState.getRollDegrees());
             int frontX = centerX + (int) Math.round((forward[0] * 3.8) * 260.0 / Math.max(1.0, forward[2] + 7.4));
             int frontY = centerY - (int) Math.round((forward[1] * 3.8) * 260.0 / Math.max(1.0, forward[2] + 7.4));
@@ -552,5 +553,9 @@ public class ShipPanel extends JPanel {
             delta += 360.0;
         }
         return delta;
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 }
