@@ -3,6 +3,25 @@
 ## Unreleased
 - No unreleased entries at this time.
 
+## 0.5 Alpha
+
+### Added
+- Added user-friendly flight control language across menus/HUD/status text (Pitch = nose up/down, Yaw = nose left/right, Roll = bank left/right), including clearer raw-axis labels for mapping.
+- Added instant-listen button remap UX for full controller mapping (`Fast Remap All Buttons...`) that auto-captures the next pressed button with Cancel/Escape support.
+- Added quick trigger remap action (`Listen and Set Trigger Button...`) using the same next-press listening flow.
+- Added optional `View -> Enable Solid Plane (retro fill)` mode with flat filled polygons inspired by retro Star Fox-style visuals while preserving wireframe outlines.
+- Added HUD speed readout in MPH derived from throttle (`0% ~= 100 MPH`, `100% ~= 1000 MPH`).
+- Added FIRE_PRIMARY hold visual: red projectile/glow effect in front of the ship while the fire button is pressed.
+
+### Changed
+- Bumped project/app version references from `0.4 Alpha` to `0.5 Alpha` across `VERSION`, Gradle metadata, README, window title, HUD text, and shared app constants.
+- Updated starfield behavior so pitch/yaw/roll influence perceived star motion (up/down and left/right response) while preserving forward-flight feel.
+- Expanded settings persistence to include visual toggles (such as solid plane mode).
+- Reset-to-defaults flow now explicitly includes visual toggles along with mappings and input settings.
+
+### Fixed
+- Kept star respawn safeguards in place while adding motion-reactive drift so the long-term drift/collapse bug is not reintroduced.
+
 ## 0.4 Alpha
 
 ### Added

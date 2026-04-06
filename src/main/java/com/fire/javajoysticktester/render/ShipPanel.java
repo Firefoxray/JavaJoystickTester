@@ -12,6 +12,7 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Polygon;
 import java.awt.Point;
 import java.awt.RenderingHints;
 import java.util.ArrayList;
@@ -45,6 +46,17 @@ public class ShipPanel extends JPanel {
             {5, 9}, {6, 9}, {7, 9}, {8, 9},
             {0, 10}, {1, 10}, {2, 10}
     };
+    private static final int[][] SHIP_FACES = {
+            {0, 1, 10}, {0, 10, 2}, {1, 3, 5}, {2, 6, 4},
+            {3, 4, 8}, {1, 7, 2}, {5, 6, 9}, {7, 9, 8},
+            {1, 3, 8, 7}, {2, 7, 8, 4}, {3, 5, 9, 8}, {4, 8, 9, 6}
+    };
+    private static final Color[] SHIP_FACE_COLORS = {
+            new Color(95, 190, 235, 220), new Color(82, 165, 220, 220), new Color(70, 120, 180, 220),
+            new Color(70, 120, 180, 220), new Color(60, 90, 145, 220), new Color(76, 140, 188, 220),
+            new Color(52, 78, 132, 220), new Color(66, 108, 162, 220), new Color(52, 90, 145, 220),
+            new Color(52, 90, 145, 220), new Color(45, 72, 120, 220), new Color(45, 72, 120, 220)
+    };
 
     private static final int STAR_COUNT = 520;
     private static final double[][] STAR_FIELD = buildStars();
@@ -56,6 +68,8 @@ public class ShipPanel extends JPanel {
     private JoystickSnapshot joystickSnapshot = JoystickSnapshot.disconnected(java.util.List.of());
     private String activeInputDescription = "Keyboard";
     private InputSystem inputSystem;
+    private boolean solidPlaneEnabled;
+    private boolean firePrimaryActive;
 
     private long lastStarNanos = System.nanoTime();
     private long starRespawnCounter = 1009;
@@ -76,6 +90,8 @@ public class ShipPanel extends JPanel {
         this.joystickSnapshot = joystickSnapshot;
         this.activeInputDescription = activeInputDescription;
         this.inputSystem = inputSystem;
+        this.solidPlaneEnabled = inputSystem != null && inputSystem.isSolidPlaneEnabled();
+        this.firePrimaryActive = inputSystem != null && inputSystem.isFirePrimaryActive();
     }
 
     @Override
@@ -86,7 +102,7 @@ public class ShipPanel extends JPanel {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
             drawBackgroundReferences(g2d);
-            drawShipWireframe(g2d);
+            drawShip(g2d);
             drawHudText(g2d);
             drawButtonPanel(g2d);
         } finally {
@@ -111,10 +127,18 @@ public class ShipPanel extends JPanel {
         lastStarNanos = now;
 
         double speed = 0.7 + shipState.getThrottle() * 3.8;
+        double yawShift = (shipState.getYawDegrees() / 55.0) * 210.0;
+        double pitchShift = (shipState.getPitchDegrees() / 42.0) * 185.0;
+        double rollShift = (shipState.getRollDegrees() / 70.0) * 90.0;
         for (double[] star : STAR_FIELD) {
             star[2] -= deltaSec * speed;
+            star[0] -= deltaSec * (yawShift + rollShift);
+            star[1] += deltaSec * pitchShift;
             if (star[2] <= 0.08) {
                 starRespawnCounter += 7919;
+                resetStar(star, (int) (starRespawnCounter & 0x7FFFFFFF));
+            } else if (Math.abs(star[0]) > 980 || Math.abs(star[1]) > 760) {
+                starRespawnCounter += 3089;
                 resetStar(star, (int) (starRespawnCounter & 0x7FFFFFFF));
             }
         }
@@ -157,13 +181,14 @@ public class ShipPanel extends JPanel {
         g2d.drawLine(centerX, centerY + 3, centerX, centerY + 12);
     }
 
-    private void drawShipWireframe(Graphics2D g2d) {
+    private void drawShip(Graphics2D g2d) {
         int width = getWidth();
         int height = getHeight();
         int centerX = width / 2;
         int centerY = height / 2;
 
         Point[] projectedPoints = new Point[SHIP_VERTICES.length];
+        double[] depthValues = new double[SHIP_VERTICES.length];
         for (int i = 0; i < SHIP_VERTICES.length; i++) {
             double[] p = SHIP_VERTICES[i];
             double[] rotated = rotateXYZ(p[0], p[1], p[2],
@@ -174,10 +199,15 @@ public class ShipPanel extends JPanel {
             double cameraDistance = 7.4;
             double depth = rotated[2] + cameraDistance;
             double perspective = 260.0 / Math.max(1.0, depth);
+            depthValues[i] = depth;
 
             int sx = centerX + (int) Math.round(rotated[0] * perspective);
             int sy = centerY - (int) Math.round(rotated[1] * perspective);
             projectedPoints[i] = new Point(sx, sy);
+        }
+
+        if (solidPlaneEnabled) {
+            drawSolidShip(g2d, projectedPoints, depthValues);
         }
 
         g2d.setStroke(new BasicStroke(2.0f));
@@ -194,6 +224,51 @@ public class ShipPanel extends JPanel {
         g2d.setStroke(new BasicStroke(2.4f));
         g2d.drawLine(centerBody.x, centerBody.y, nose.x, nose.y);
         g2d.fillOval(nose.x - 4, nose.y - 4, 8, 8);
+
+        if (firePrimaryActive) {
+            drawFirePrimaryEffect(g2d, nose, centerBody);
+        }
+    }
+
+    private void drawSolidShip(Graphics2D g2d, Point[] points, double[] depthValues) {
+        List<Integer> faceOrder = new ArrayList<>();
+        for (int i = 0; i < SHIP_FACES.length; i++) {
+            faceOrder.add(i);
+        }
+
+        faceOrder.sort((a, b) -> Double.compare(avgDepth(SHIP_FACES[b], depthValues), avgDepth(SHIP_FACES[a], depthValues)));
+        for (int faceIdx : faceOrder) {
+            int[] face = SHIP_FACES[faceIdx];
+            Polygon polygon = new Polygon();
+            for (int vertex : face) {
+                polygon.addPoint(points[vertex].x, points[vertex].y);
+            }
+            g2d.setColor(SHIP_FACE_COLORS[faceIdx % SHIP_FACE_COLORS.length]);
+            g2d.fillPolygon(polygon);
+        }
+    }
+
+    private static double avgDepth(int[] face, double[] depthValues) {
+        double total = 0.0;
+        for (int index : face) {
+            total += depthValues[index];
+        }
+        return total / Math.max(1, face.length);
+    }
+
+    private void drawFirePrimaryEffect(Graphics2D g2d, Point nose, Point centerBody) {
+        int dx = nose.x - centerBody.x;
+        int dy = nose.y - centerBody.y;
+        double len = Math.max(1.0, Math.hypot(dx, dy));
+        int fx = nose.x + (int) Math.round(dx / len * 24.0);
+        int fy = nose.y + (int) Math.round(dy / len * 24.0);
+
+        g2d.setColor(new Color(255, 90, 90, 130));
+        g2d.fillOval(fx - 12, fy - 12, 24, 24);
+        g2d.setColor(new Color(255, 45, 45, 220));
+        g2d.fillOval(fx - 5, fy - 5, 10, 10);
+        g2d.setColor(new Color(255, 170, 170, 210));
+        g2d.drawLine(nose.x, nose.y, fx, fy);
     }
 
     private void drawHudText(Graphics2D g2d) {
@@ -211,15 +286,18 @@ public class ShipPanel extends JPanel {
         g2d.drawString(String.format("Yaw:   %7.2f°  (target %7.2f°)", shipState.getYawDegrees(), shipState.getTargetYawDegrees()), x, y + lineHeight * 2);
         g2d.drawString(String.format("Roll:  %7.2f°  (target %7.2f°)", shipState.getRollDegrees(), shipState.getTargetRollDegrees()), x, y + lineHeight * 3);
         g2d.drawString(String.format("Throttle: %6.1f%% (target %6.1f%%)", shipState.getThrottle() * 100.0, shipState.getTargetThrottle() * 100.0), x, y + lineHeight * 4);
+        double mph = 100.0 + shipState.getThrottle() * 900.0;
+        g2d.drawString(String.format("Speed: %6.0f MPH", mph), x, y + lineHeight * 5);
 
         g2d.setColor(new Color(130, 190, 235));
-        g2d.drawString("Controls: Arrows=Pitch/Yaw, Q/E=Roll, W/S=Throttle", x, y + lineHeight * 6);
-        g2d.drawString("Settings: input/mapping/reset + manual full button mapping", x, y + lineHeight * 7);
+        g2d.drawString("Flight Controls: Pitch=nose up/down | Yaw=nose left/right | Roll=bank left/right", x, y + lineHeight * 7);
+        g2d.drawString("Keyboard: Arrows=Pitch/Yaw, Q/E=Roll, W/S=Throttle", x, y + lineHeight * 8);
 
-        g2d.drawString("Preferred Input: " + preferredInputDevice + " | Active: " + activeInputDescription, x, y + lineHeight * 8);
-        g2d.drawString("Joystick access: " + joystickSnapshot.accessStatus(), x, y + lineHeight * 9);
-        g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO") + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 10);
-        g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 11);
+        g2d.drawString("Preferred Input: " + preferredInputDevice + " | Active: " + activeInputDescription, x, y + lineHeight * 9);
+        g2d.drawString("Joystick access: " + joystickSnapshot.accessStatus(), x, y + lineHeight * 10);
+        g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO") + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 11);
+        g2d.drawString("Plane Render: " + (solidPlaneEnabled ? "Solid Retro Fill + Wireframe" : "Wireframe"), x, y + lineHeight * 12);
+        g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 13);
     }
 
     private void drawButtonPanel(Graphics2D g2d) {

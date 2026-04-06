@@ -37,6 +37,8 @@ public class InputSystem {
     private boolean invertThrottle;
     private int triggerButtonIndex = 0;
     private JoystickButtonAction triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
+    private boolean solidPlaneEnabled;
+    private boolean firePrimaryActive;
 
     private final Map<String, Map<Integer, String>> manualButtonMappings = new LinkedHashMap<>();
     private Runnable settingsChangedListener = () -> {
@@ -50,6 +52,7 @@ public class InputSystem {
 
     public void update(ShipState shipState, double deltaTimeSec) {
         lastJoystickSnapshot = joystickInput.poll();
+        firePrimaryActive = false;
 
         boolean joystickShouldDrive = switch (preferredInputDevice) {
             case JOYSTICK -> lastJoystickSnapshot.connected();
@@ -118,6 +121,15 @@ public class InputSystem {
 
     public String getActiveInputDescription() {
         return activeInputDescription;
+    }
+
+    public boolean isSolidPlaneEnabled() {
+        return solidPlaneEnabled;
+    }
+
+    public void setSolidPlaneEnabled(boolean solidPlaneEnabled) {
+        this.solidPlaneEnabled = solidPlaneEnabled;
+        onSettingsChanged();
     }
 
     public JoystickAxisOption getPitchAxis() {
@@ -308,6 +320,7 @@ public class InputSystem {
 
         triggerButtonIndex = 0;
         triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
+        solidPlaneEnabled = false;
 
         manualButtonMappings.clear();
         onSettingsChanged();
@@ -358,6 +371,7 @@ public class InputSystem {
 
     private void applyJoystick(ShipState shipState, JoystickSnapshot snapshot, double deltaTimeSec) {
         Map<String, Float> axes = snapshot.axes();
+        firePrimaryActive = false;
 
         double pitch = withDeadzone(resolveAxisValue(axes, pitchAxis, "y", "y axis", "y-achsen"));
         double yaw = withDeadzone(resolveAxisValue(axes, yawAxis, "x", "x axis", "x-achsen"));
@@ -377,8 +391,10 @@ public class InputSystem {
             shipState.setThrottleTarget((-throttle + 1.0) * 0.5);
         }
 
-        if (isLogicalButtonPressed(snapshot, triggerButtonIndex)) {
+        boolean triggerPressed = isLogicalButtonPressed(snapshot, triggerButtonIndex);
+        if (triggerPressed) {
             applyTriggerAction(shipState, deltaTimeSec);
+            firePrimaryActive = triggerButtonAction == JoystickButtonAction.FIRE_PRIMARY;
         }
     }
 
@@ -392,8 +408,14 @@ public class InputSystem {
                 // no-op
             }
             case BOOST -> shipState.addThrottleTarget(THROTTLE_UNITS_PER_SEC * deltaTimeSec * 2.5);
-            case FIRE_PRIMARY -> shipState.addRollTarget(18.0 * deltaTimeSec);
+            case FIRE_PRIMARY -> {
+                // visual-only effect is rendered by HUD/ship panel while held
+            }
         }
+    }
+
+    public boolean isFirePrimaryActive() {
+        return firePrimaryActive;
     }
 
     private static List<Integer> extractButtonIndices(Map<String, Boolean> buttons) {
