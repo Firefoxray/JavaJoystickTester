@@ -25,3 +25,4 @@ out/
 # Kotlin plugin data
 .kotlin/
 .codex/
+.codex/
