@@ -29,6 +29,10 @@ public class InputSystem {
     private JoystickAxisOption yawAxis = JoystickAxisOption.X;
     private JoystickAxisOption rollAxis = JoystickAxisOption.RZ;
     private JoystickAxisOption throttleAxis = JoystickAxisOption.SLIDER;
+    private boolean invertPitch;
+    private boolean invertYaw;
+    private boolean invertRoll;
+    private boolean invertThrottle;
     private int triggerButtonIndex = 0;
     private JoystickButtonAction triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
 
@@ -119,6 +123,38 @@ public class InputSystem {
         this.throttleAxis = throttleAxis;
     }
 
+    public boolean isInvertPitch() {
+        return invertPitch;
+    }
+
+    public void setInvertPitch(boolean invertPitch) {
+        this.invertPitch = invertPitch;
+    }
+
+    public boolean isInvertYaw() {
+        return invertYaw;
+    }
+
+    public void setInvertYaw(boolean invertYaw) {
+        this.invertYaw = invertYaw;
+    }
+
+    public boolean isInvertRoll() {
+        return invertRoll;
+    }
+
+    public void setInvertRoll(boolean invertRoll) {
+        this.invertRoll = invertRoll;
+    }
+
+    public boolean isInvertThrottle() {
+        return invertThrottle;
+    }
+
+    public void setInvertThrottle(boolean invertThrottle) {
+        this.invertThrottle = invertThrottle;
+    }
+
     public int getTriggerButtonIndex() {
         return triggerButtonIndex;
     }
@@ -186,6 +222,11 @@ public class InputSystem {
         double roll = withDeadzone(resolveAxisValue(axes, rollAxis, "rz", "z rotation", "z-rotation", "z", "z axis", "z-achsen"));
         double throttle = withDeadzone(resolveAxisValue(axes, throttleAxis, "slider", "throttle", "z"));
 
+        pitch = applyInvert(pitch, invertPitch);
+        yaw = applyInvert(yaw, invertYaw);
+        roll = applyInvert(roll, invertRoll);
+        throttle = applyInvert(throttle, invertThrottle);
+
         shipState.setPitchTargetDegrees(pitch * STARFOX_MAX_PITCH);
         shipState.setYawTargetDegrees(yaw * STARFOX_MAX_YAW);
         shipState.setRollTargetDegrees(roll * STARFOX_MAX_ROLL);
@@ -199,6 +240,10 @@ public class InputSystem {
         }
     }
 
+    private static double applyInvert(double value, boolean invert) {
+        return invert ? -value : value;
+    }
+
     private void applyTriggerAction(ShipState shipState, double deltaTimeSec) {
         switch (triggerButtonAction) {
             case NONE -> {
@@ -210,19 +255,42 @@ public class InputSystem {
     }
 
     private static boolean isButtonPressed(Map<String, Boolean> buttons, int targetButtonIndex) {
-        String numericKey = Integer.toString(targetButtonIndex);
         for (Map.Entry<String, Boolean> entry : buttons.entrySet()) {
             if (!entry.getValue()) {
                 continue;
             }
-            String normalized = entry.getKey().trim().toLowerCase();
-            if (normalized.equals(numericKey)
-                    || normalized.equals("button " + numericKey)
-                    || normalized.endsWith(" " + numericKey)) {
+            Integer parsed = parseButtonIndex(entry.getKey());
+            if (parsed != null && parsed == targetButtonIndex) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static Integer parseButtonIndex(String raw) {
+        if (raw == null) {
+            return null;
+        }
+
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (Character.isDigit(c)) {
+                digits.append(c);
+            } else if (digits.length() > 0) {
+                break;
+            }
+        }
+
+        if (digits.length() == 0) {
+            return null;
+        }
+
+        try {
+            return Integer.parseInt(digits.toString());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private static double withDeadzone(double value) {

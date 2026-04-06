@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.3 Alpha
+
+### Added
+- Added `run_joystick_tester.sh` in the project root as a launcher-friendly script that runs `./gradlew run` from the project directory.
+- Added Linux desktop launcher installation flow under `Extras -> Install Desktop Launcher`.
+- Added `DesktopLauncherInstaller` to create per-user desktop entry/script/icon assets.
+- Added axis inversion toggles for pitch, yaw, roll, and throttle in `Settings -> Joystick Mapping -> Invert Axes`.
+
+### Changed
+- Bumped project/app version references from `0.2 Alpha` to `0.3 Alpha` across `VERSION`, Gradle metadata, README, window title, and HUD text.
+- Renamed the top-level menu from `Updates` to `Extras`, keeping update checks and adding launcher install.
+- Improved starfield effect with higher density and clearer forward-motion streaking while preserving HUD readability and ship visibility.
+- Improved button labeling/display by normalizing button keys to numeric `Button N` format when available.
+- Expanded trigger button fallback menu range to `Button 0` through `Button 15` when no live button indices are detected.
+
+### Fixed
+- Addressed T.16000M button index visibility issues where only a partial `B2-B6` range appeared in some setups by improving identifier parsing and fallback numbering behavior.
+
 ## 0.2 Alpha
 
 ### Added

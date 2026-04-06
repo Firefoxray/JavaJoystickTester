@@ -70,6 +70,7 @@ public class JoystickInput {
 
         Map<String, Float> axes = new LinkedHashMap<>();
         Map<String, Boolean> buttons = new LinkedHashMap<>();
+        int fallbackButtonIndex = 0;
 
         for (Component component : activeController.getComponents()) {
             float value = component.getPollData();
@@ -77,7 +78,9 @@ public class JoystickInput {
             if (component.isAnalog()) {
                 axes.put(name, value);
             } else {
-                buttons.put(name, value > 0.5f);
+                String buttonKey = normalizeButtonKey(component, fallbackButtonIndex);
+                buttons.put(buttonKey, value > 0.5f);
+                fallbackButtonIndex++;
             }
         }
 
@@ -157,6 +160,45 @@ public class JoystickInput {
         }
 
         return score;
+    }
+
+    private static String normalizeButtonKey(Component component, int fallbackButtonIndex) {
+        Component.Identifier identifier = component.getIdentifier();
+        String idName = identifier != null ? identifier.getName() : null;
+        Integer parsed = parseButtonIndex(idName);
+        if (parsed == null) {
+            parsed = parseButtonIndex(component.getName());
+        }
+        if (parsed == null) {
+            parsed = fallbackButtonIndex;
+        }
+        return "Button " + parsed;
+    }
+
+    private static Integer parseButtonIndex(String raw) {
+        if (raw == null) {
+            return null;
+        }
+
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (Character.isDigit(c)) {
+                digits.append(c);
+            } else if (digits.length() > 0) {
+                break;
+            }
+        }
+
+        if (digits.length() == 0) {
+            return null;
+        }
+
+        try {
+            return Integer.parseInt(digits.toString());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private static boolean isT16000Name(String name) {

@@ -44,7 +44,7 @@ public class ShipPanel extends JPanel {
             {0, 10}, {1, 10}, {2, 10}
     };
 
-    private static final int STAR_COUNT = 220;
+    private static final int STAR_COUNT = 520;
     private static final double[][] STAR_FIELD = buildStars();
 
     private final ShipState shipState;
@@ -101,7 +101,7 @@ public class ShipPanel extends JPanel {
         double deltaSec = Math.max(0.0, (now - lastStarNanos) / 1_000_000_000.0);
         lastStarNanos = now;
 
-        double speed = 0.5 + shipState.getThrottle() * 2.8;
+        double speed = 0.7 + shipState.getThrottle() * 3.8;
         for (double[] star : STAR_FIELD) {
             star[2] -= deltaSec * speed;
             if (star[2] <= 0.08) {
@@ -117,14 +117,23 @@ public class ShipPanel extends JPanel {
 
             int x = centerX + (int) Math.round(star[0] * perspective);
             int y = centerY + (int) Math.round(star[1] * perspective);
+            int trailX = centerX + (int) Math.round(star[0] * (1.0 / (depth + 0.085)));
+            int trailY = centerY + (int) Math.round(star[1] * (1.0 / (depth + 0.085)));
 
             if (x < 0 || x >= width || y < 0 || y >= height) {
                 continue;
             }
 
-            int shade = (int) Math.round(140 + (1.0 - depth) * 110);
-            g2d.setColor(new Color(shade, shade, 255, 180));
-            int size = depth < 0.35 ? 3 : (depth < 0.7 ? 2 : 1);
+            int shade = (int) Math.round(145 + (1.0 - depth) * 105);
+            int alpha = (int) Math.round(120 + (1.0 - depth) * 110);
+            g2d.setColor(new Color(shade, shade, 255, Math.max(70, Math.min(alpha, 240))));
+
+            if (depth < 0.58) {
+                g2d.setStroke(new BasicStroke(depth < 0.28 ? 1.9f : 1.2f));
+                g2d.drawLine(trailX, trailY, x, y);
+            }
+
+            int size = depth < 0.28 ? 3 : (depth < 0.65 ? 2 : 1);
             g2d.fillRect(x, y, size, size);
         }
     }
@@ -185,7 +194,7 @@ public class ShipPanel extends JPanel {
         int lineHeight = 18;
 
         g2d.setColor(new Color(220, 240, 255));
-        g2d.drawString("Java Joystick Tester (0.2 Alpha)", x, y);
+        g2d.drawString("Java Joystick Tester (0.3 Alpha)", x, y);
 
         g2d.setColor(new Color(170, 220, 255));
         g2d.drawString(String.format("Pitch: %7.2f°  (target %7.2f°)", shipState.getPitchDegrees(), shipState.getTargetPitchDegrees()), x, y + lineHeight);
@@ -262,7 +271,7 @@ public class ShipPanel extends JPanel {
             g2d.drawRoundRect(cellX, cellY, cellWidth - 8, cellHeight, 8, 8);
 
             g2d.setColor(new Color(235, 245, 255));
-            g2d.drawString("B" + index, cellX + 8, cellY + 16);
+            g2d.drawString("Button " + index, cellX + 6, cellY + 16);
         }
     }
 
@@ -344,9 +353,9 @@ public class ShipPanel extends JPanel {
     private static void resetStar(double[] star, int seed) {
         double nx = (((seed * 73) % 1000) / 999.0) * 2.0 - 1.0;
         double ny = (((seed * 151 + 37) % 1000) / 999.0) * 2.0 - 1.0;
-        double depth = 0.35 + (((seed * 199 + 11) % 1000) / 999.0) * 1.2;
-        star[0] = nx * 460.0;
-        star[1] = ny * 320.0;
+        double depth = 0.22 + (((seed * 199 + 11) % 1000) / 999.0) * 1.28;
+        star[0] = nx * 540.0;
+        star[1] = ny * 380.0;
         star[2] = depth;
         star[3] = seed;
     }
