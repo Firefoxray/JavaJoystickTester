@@ -69,6 +69,7 @@ public class MainWindow {
         configManager.loadInto(inputSystem);
 
         keyboardInput.install(shipPanel);
+        shipPanel.setLogicalButtonRemapRequester(this::startPerLogicalRemap);
 
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());

@@ -1,9 +1,9 @@
-# Java Joystick Tester (0.8)
+# Java Joystick Tester (0.9)
 
 A Swing/Java2D flight-input sandbox for testing keyboard and joystick controls against a ship HUD.
 
 ## Version
-Current version: `0.8`
+Current version: `0.9`
 
 ## What works in this version
 - Main entry point remains `com.fire.javajoysticktester.Main`.
@@ -15,8 +15,8 @@ Current version: `0.8`
 - **Simple single-button remap actions** for Trigger and Boost (`Remap Trigger Button...`, `Remap Boost Button...`).
 - **Persistent config file** auto-load/save at `~/.java-joystick-tester/config.properties` including button maps + visual toggles.
 - **Reset to defaults** (`Settings -> Reset to Defaults...`) with confirmation and config wipe/rewrite.
-- HUD + side panel showing live axis values, controller status, speed (MPH), and clean logical button states (`B0..B15`).
-- Rebalanced motion-reactive starfield with toned-down turn/parallax behavior while preserving forward feel.
+- HUD + side panel showing live axis values, controller status, speed (MPH), and clean logical button states (`B0..B15`), plus click-to-remap support directly from the right-side button tiles.
+- Faster motion-reactive starfield so forward speed reads more aggressively even at lower throttle.
 - Ship render orientation flipped so the craft flies away from camera (back facing viewer), with FIRE_PRIMARY still emitted from ship front/nose.
 - `BOOST` default mapping is logical `Button 1` (editable in Joystick Mapping menu).
 - `Settings -> Debug Mode` retains FRONT/BACK orientation labels for easy direction checks.

@@ -14,8 +14,12 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
@@ -53,10 +57,10 @@ public class ShipPanel extends JPanel {
             {1, 3, 8, 7}, {2, 7, 8, 4}, {3, 5, 9, 8}, {4, 8, 9, 6}
     };
     private static final Color[] SHIP_FACE_COLORS = {
-            new Color(95, 190, 235, 220), new Color(82, 165, 220, 220), new Color(70, 120, 180, 220),
-            new Color(70, 120, 180, 220), new Color(60, 90, 145, 220), new Color(76, 140, 188, 220),
-            new Color(52, 78, 132, 220), new Color(66, 108, 162, 220), new Color(52, 90, 145, 220),
-            new Color(52, 90, 145, 220), new Color(45, 72, 120, 220), new Color(45, 72, 120, 220)
+            new Color(235, 98, 104, 220), new Color(255, 160, 72, 220), new Color(255, 208, 96, 220),
+            new Color(154, 220, 100, 220), new Color(92, 210, 178, 220), new Color(85, 176, 246, 220),
+            new Color(132, 138, 247, 220), new Color(178, 118, 248, 220), new Color(222, 120, 228, 220),
+            new Color(255, 126, 185, 220), new Color(186, 150, 126, 220), new Color(126, 188, 216, 220)
     };
 
     private static final int STAR_COUNT = 520;
@@ -80,11 +84,29 @@ public class ShipPanel extends JPanel {
 
     private long lastStarNanos = System.nanoTime();
     private long starRespawnCounter = 1009;
+    private final Map<Integer, Rectangle> buttonCellBounds = new HashMap<>();
+    private java.util.function.IntConsumer logicalButtonRemapRequester;
 
     public ShipPanel(ShipState shipState) {
         this.shipState = shipState;
         setBackground(new Color(8, 12, 24));
         setFocusable(true);
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (logicalButtonRemapRequester == null) {
+                    return;
+                }
+                int logicalButton = findLogicalButtonAt(e.getX(), e.getY());
+                if (logicalButton >= 0) {
+                    logicalButtonRemapRequester.accept(logicalButton);
+                }
+            }
+        });
+    }
+
+    public void setLogicalButtonRemapRequester(java.util.function.IntConsumer logicalButtonRemapRequester) {
+        this.logicalButtonRemapRequester = logicalButtonRemapRequester;
     }
 
     public void updateInputDebug(PreferredInputDevice preferredInputDevice,
@@ -143,8 +165,8 @@ public class ShipPanel extends JPanel {
         lastPitchDegrees = shipState.getPitchDegrees();
         lastRollDegrees = shipState.getRollDegrees();
 
-        double boostMultiplier = boostActive ? 1.45 : 1.0;
-        double speed = (0.34 + shipState.getThrottle() * 1.25) * boostMultiplier;
+        double boostMultiplier = boostActive ? 1.85 : 1.0;
+        double speed = (0.85 + shipState.getThrottle() * 2.85) * boostMultiplier;
         double attitudeDeltaScale = deltaSec * 32.0;
         double yawShift = yawDelta * attitudeDeltaScale;
         double pitchShift = pitchDelta * attitudeDeltaScale;
@@ -355,6 +377,7 @@ public class ShipPanel extends JPanel {
     }
 
     private void drawButtonPanel(Graphics2D g2d) {
+        buttonCellBounds.clear();
         int panelWidth = 260;
         int panelHeight = Math.max(180, getHeight() - 32);
         int panelX = getWidth() - panelWidth - 16;
@@ -377,6 +400,8 @@ public class ShipPanel extends JPanel {
         String controllerName = joystickSnapshot.connected() ? joystickSnapshot.controllerName() : "No controller";
         g2d.setColor(new Color(160, 210, 245));
         g2d.drawString(clipText(controllerName, 30), x, y + 16);
+        g2d.setColor(new Color(135, 180, 215));
+        g2d.drawString("Click a tile to remap that logical button", x, y + 30);
 
         List<Integer> buttonIndices = inputSystem != null
                 ? inputSystem.getLogicalButtonIndices(joystickSnapshot)
@@ -388,7 +413,7 @@ public class ShipPanel extends JPanel {
             return;
         }
 
-        int top = y + 30;
+        int top = y + 44;
         int cols = 5;
         int gap = 4;
         int cellWidth = (panelWidth - 24 - (cols - 1) * gap) / cols;
@@ -418,6 +443,7 @@ public class ShipPanel extends JPanel {
             g2d.fillRoundRect(cellX, cellY, cellWidth, cellHeight, 8, 8);
             g2d.setColor(border);
             g2d.drawRoundRect(cellX, cellY, cellWidth, cellHeight, 8, 8);
+            buttonCellBounds.put(index, new Rectangle(cellX, cellY, cellWidth, cellHeight));
 
             g2d.setColor(new Color(235, 245, 255));
             String label = inputSystem != null
@@ -425,6 +451,15 @@ public class ShipPanel extends JPanel {
                     : "B" + index;
             g2d.drawString(clipText(label, 8), cellX + 4, cellY + 15);
         }
+    }
+
+    private int findLogicalButtonAt(int x, int y) {
+        for (Map.Entry<Integer, Rectangle> entry : buttonCellBounds.entrySet()) {
+            if (entry.getValue().contains(x, y)) {
+                return entry.getKey();
+            }
+        }
+        return -1;
     }
 
     private static String clipText(String text, int max) {
