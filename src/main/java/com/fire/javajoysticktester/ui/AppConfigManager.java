@@ -62,7 +62,8 @@ public class AppConfigManager {
 
                 inputSystem.setTriggerButtonIndex(parseInt(properties.getProperty("trigger.button"), 0));
                 inputSystem.setTriggerButtonAction(parseEnum(properties.getProperty("trigger.action"), JoystickButtonAction.class, JoystickButtonAction.FIRE_PRIMARY));
-                inputSystem.setSolidPlaneEnabled(Boolean.parseBoolean(properties.getProperty("visual.solid_plane", "false")));
+                inputSystem.setSolidPlaneEnabled(Boolean.parseBoolean(properties.getProperty("visual.solid_plane", "true")));
+                inputSystem.setDebugModeEnabled(Boolean.parseBoolean(properties.getProperty("visual.debug_mode", "false")));
 
                 inputSystem.setManualButtonMappings(parseManualMappings(properties));
             });
@@ -92,6 +93,7 @@ public class AppConfigManager {
         properties.setProperty("trigger.button", Integer.toString(inputSystem.getTriggerButtonIndex()));
         properties.setProperty("trigger.action", inputSystem.getTriggerButtonAction().name());
         properties.setProperty("visual.solid_plane", Boolean.toString(inputSystem.isSolidPlaneEnabled()));
+        properties.setProperty("visual.debug_mode", Boolean.toString(inputSystem.isDebugModeEnabled()));
 
         for (Map.Entry<String, Map<Integer, String>> controllerEntry : inputSystem.getManualButtonMappings().entrySet()) {
             String controller = sanitize(controllerEntry.getKey());

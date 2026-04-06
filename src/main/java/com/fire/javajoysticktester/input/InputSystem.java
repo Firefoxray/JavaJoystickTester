@@ -37,8 +37,10 @@ public class InputSystem {
     private boolean invertThrottle;
     private int triggerButtonIndex = 0;
     private JoystickButtonAction triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
-    private boolean solidPlaneEnabled;
+    private boolean solidPlaneEnabled = true;
+    private boolean debugModeEnabled;
     private boolean firePrimaryActive;
+    private boolean boostActive;
 
     private final Map<String, Map<Integer, String>> manualButtonMappings = new LinkedHashMap<>();
     private Runnable settingsChangedListener = () -> {
@@ -53,6 +55,7 @@ public class InputSystem {
     public void update(ShipState shipState, double deltaTimeSec) {
         lastJoystickSnapshot = joystickInput.poll();
         firePrimaryActive = false;
+        boostActive = false;
 
         boolean joystickShouldDrive = switch (preferredInputDevice) {
             case JOYSTICK -> lastJoystickSnapshot.connected();
@@ -129,6 +132,15 @@ public class InputSystem {
 
     public void setSolidPlaneEnabled(boolean solidPlaneEnabled) {
         this.solidPlaneEnabled = solidPlaneEnabled;
+        onSettingsChanged();
+    }
+
+    public boolean isDebugModeEnabled() {
+        return debugModeEnabled;
+    }
+
+    public void setDebugModeEnabled(boolean debugModeEnabled) {
+        this.debugModeEnabled = debugModeEnabled;
         onSettingsChanged();
     }
 
@@ -304,6 +316,28 @@ public class InputSystem {
         return isButtonPressed(snapshot.buttons(), targetButtonIndex);
     }
 
+    public String getLogicalButtonLabel(JoystickSnapshot snapshot, int targetButtonIndex) {
+        Map<Integer, String> mapping = getManualMappingForController(snapshot.controllerName());
+        String mappedKey = mapping.get(targetButtonIndex);
+        if (mappedKey != null && !mappedKey.isBlank()) {
+            return "B" + targetButtonIndex + "←" + mappedKey.replace("Button ", "B");
+        }
+        return "B" + targetButtonIndex;
+    }
+
+    public Integer resolveLogicalButtonForPhysicalKey(JoystickSnapshot snapshot, String physicalButtonKey) {
+        if (physicalButtonKey == null || physicalButtonKey.isBlank()) {
+            return null;
+        }
+        Map<Integer, String> mapping = getManualMappingForController(snapshot.controllerName());
+        for (Map.Entry<Integer, String> entry : mapping.entrySet()) {
+            if (physicalButtonKey.equals(entry.getValue())) {
+                return entry.getKey();
+            }
+        }
+        return parseButtonIndex(physicalButtonKey);
+    }
+
     public void resetToDefaults() {
         preferredInputDevice = PreferredInputDevice.AUTO;
         joystickInput.setManualControllerSelection(null);
@@ -320,7 +354,8 @@ public class InputSystem {
 
         triggerButtonIndex = 0;
         triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
-        solidPlaneEnabled = false;
+        solidPlaneEnabled = true;
+        debugModeEnabled = false;
 
         manualButtonMappings.clear();
         onSettingsChanged();
@@ -395,6 +430,7 @@ public class InputSystem {
         if (triggerPressed) {
             applyTriggerAction(shipState, deltaTimeSec);
             firePrimaryActive = triggerButtonAction == JoystickButtonAction.FIRE_PRIMARY;
+            boostActive = triggerButtonAction == JoystickButtonAction.BOOST;
         }
     }
 
@@ -407,7 +443,9 @@ public class InputSystem {
             case NONE -> {
                 // no-op
             }
-            case BOOST -> shipState.addThrottleTarget(THROTTLE_UNITS_PER_SEC * deltaTimeSec * 2.5);
+            case BOOST -> {
+                // Boost is a temporary +MPH visual/flight-feel overlay while held.
+            }
             case FIRE_PRIMARY -> {
                 // visual-only effect is rendered by HUD/ship panel while held
             }
@@ -416,6 +454,10 @@ public class InputSystem {
 
     public boolean isFirePrimaryActive() {
         return firePrimaryActive;
+    }
+
+    public boolean isBoostActive() {
+        return boostActive;
     }
 
     private static List<Integer> extractButtonIndices(Map<String, Boolean> buttons) {

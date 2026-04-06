@@ -3,6 +3,24 @@
 ## Unreleased
 - No unreleased entries at this time.
 
+## 0.6
+
+### Added
+- Added `Settings -> Debug Mode` toggle with a visible HUD `DEBUG MODE` indicator.
+- Added debug-only ship orientation labels (`FRONT`/`BACK`) to make nose/tail direction obvious while tuning controls.
+
+### Changed
+- Bumped project/app version references from `0.5 Alpha` to `0.6` across `VERSION`, Gradle metadata, README, window title, HUD text, and shared app constants.
+- Updated BOOST behavior so holding BOOST adds a temporary **+500 MPH** to current speed while preserving the normal MPH readout baseline.
+- Improved boost visuals with faster/longer star streaking and brighter boost-era star tinting.
+- Updated debug mode default rendering behavior: debug ON defaults to wireframe; debug OFF defaults to solid retro fill + wireframe.
+
+### Fixed
+- Fixed diagonal starfield direction issues by switching directional star shifts to stable per-frame attitude deltas (yaw/pitch/roll), preventing wrong-way diagonal movement while keeping forward-flight feel.
+- Fixed FIRE_PRIMARY origin to consistently emit from the ship nose/front rather than the back.
+- Improved button remap reliability by waiting for release and then detecting newly pressed buttons from rolling snapshots (reducing stale-snapshot misses).
+- Fixed trigger remap behavior to honor manual mapping as source-of-truth when present, so displayed logical labels and action behavior stay aligned (including T.16000M workflows).
+
 ## 0.5 Alpha
 
 ### Added

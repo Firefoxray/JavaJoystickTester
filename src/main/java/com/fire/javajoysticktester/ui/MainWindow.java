@@ -169,12 +169,20 @@ public class MainWindow {
         JMenuItem controlsItem = new JMenuItem("Controls & Input Status...");
         controlsItem.addActionListener(e -> showControlsDialog());
 
+        JCheckBoxMenuItem debugModeItem = new JCheckBoxMenuItem("Debug Mode", inputSystem.isDebugModeEnabled());
+        debugModeItem.addActionListener(e -> {
+            boolean enabled = debugModeItem.isSelected();
+            inputSystem.setDebugModeEnabled(enabled);
+            inputSystem.setSolidPlaneEnabled(!enabled);
+        });
+
         JMenuItem resetDefaultsItem = new JMenuItem("Reset to Defaults...");
         resetDefaultsItem.addActionListener(e -> resetToDefaults());
 
         settingsMenu.add(inputMenu);
         settingsMenu.add(joystickMenu);
         settingsMenu.add(mappingMenu);
+        settingsMenu.add(debugModeItem);
         settingsMenu.add(controlsItem);
         settingsMenu.addSeparator();
         settingsMenu.add(resetDefaultsItem);
@@ -429,7 +437,8 @@ public class MainWindow {
     }
 
     private String captureButtonKeyForStep(int logical) {
-        List<String> baselinePressed = pressedButtonKeys(inputSystem.pollJoystickSnapshotNow());
+        waitForButtonsToRelease(900);
+        List<String> previousPressed = pressedButtonKeys(inputSystem.pollJoystickSnapshotNow());
         long deadlineMillis = System.currentTimeMillis() + 7000;
         AtomicBoolean cancelled = new AtomicBoolean(false);
         javax.swing.JDialog listeningDialog = buildListeningDialog(logical, cancelled);
@@ -444,7 +453,7 @@ public class MainWindow {
             List<String> pressed = pressedButtonKeys(live);
             List<String> newlyPressed = new ArrayList<>();
             for (String key : pressed) {
-                if (!baselinePressed.contains(key)) {
+                if (!previousPressed.contains(key)) {
                     newlyPressed.add(key);
                 }
             }
@@ -465,6 +474,7 @@ public class MainWindow {
                 );
                 return selected == null ? null : selected.toString();
             }
+            previousPressed = pressed;
 
             try {
                 Thread.sleep(30L);
@@ -477,6 +487,22 @@ public class MainWindow {
 
         listeningDialog.dispose();
         return null;
+    }
+
+    private void waitForButtonsToRelease(long timeoutMs) {
+        long deadline = System.currentTimeMillis() + Math.max(100, timeoutMs);
+        while (System.currentTimeMillis() < deadline) {
+            JoystickSnapshot snapshot = inputSystem.pollJoystickSnapshotNow();
+            if (pressedButtonKeys(snapshot).isEmpty()) {
+                return;
+            }
+            try {
+                Thread.sleep(25L);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     private javax.swing.JDialog buildListeningDialog(int logical, AtomicBoolean cancelled) {
@@ -524,8 +550,9 @@ public class MainWindow {
             return;
         }
 
+        JoystickSnapshot liveSnapshot = inputSystem.pollJoystickSnapshotNow();
         String selectedKey = captureButtonKeyForStep(inputSystem.getTriggerButtonIndex());
-        Integer detectedIndex = parseButtonIndex(selectedKey);
+        Integer detectedIndex = inputSystem.resolveLogicalButtonForPhysicalKey(liveSnapshot, selectedKey);
         if (detectedIndex == null) {
             return;
         }
@@ -545,29 +572,6 @@ public class MainWindow {
             }
         }
         return pressed;
-    }
-
-    private static Integer parseButtonIndex(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        StringBuilder digits = new StringBuilder();
-        for (int i = 0; i < raw.length(); i++) {
-            char c = raw.charAt(i);
-            if (Character.isDigit(c)) {
-                digits.append(c);
-            } else if (!digits.isEmpty()) {
-                break;
-            }
-        }
-        if (digits.isEmpty()) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(digits.toString());
-        } catch (NumberFormatException ex) {
-            return null;
-        }
     }
 
     private void clearManualButtonMapping() {
@@ -653,6 +657,7 @@ public class MainWindow {
                 .append(inputSystem.isInvertThrottle() ? " (inverted)" : "").append("\n");
         text.append(" - Trigger: Button ").append(inputSystem.getTriggerButtonIndex())
                 .append(" -> ").append(inputSystem.getTriggerButtonAction()).append("\n");
+        text.append(" - Debug mode: ").append(inputSystem.isDebugModeEnabled() ? "ON" : "OFF").append("\n");
         text.append(" - Plane mode: ").append(inputSystem.isSolidPlaneEnabled() ? "Solid retro fill + wireframe" : "Wireframe").append("\n");
 
         Map<Integer, String> manualMap = inputSystem.getManualMappingForController(snapshot.controllerName());
