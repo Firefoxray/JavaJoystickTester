@@ -70,6 +70,7 @@ public class ShipPanel extends JPanel {
     private String activeInputDescription = "Keyboard";
     private InputSystem inputSystem;
     private boolean solidPlaneEnabled;
+    private boolean flipShipOrientation;
     private boolean firePrimaryActive;
     private boolean boostActive;
     private boolean debugModeEnabled;
@@ -97,6 +98,7 @@ public class ShipPanel extends JPanel {
         this.activeInputDescription = activeInputDescription;
         this.inputSystem = inputSystem;
         this.solidPlaneEnabled = inputSystem != null && inputSystem.isSolidPlaneEnabled();
+        this.flipShipOrientation = inputSystem != null && inputSystem.isFlipShipOrientation();
         this.firePrimaryActive = inputSystem != null && inputSystem.isFirePrimaryActive();
         this.boostActive = inputSystem != null && inputSystem.isBoostActive();
         this.debugModeEnabled = inputSystem != null && inputSystem.isDebugModeEnabled();
@@ -210,11 +212,12 @@ public class ShipPanel extends JPanel {
 
         Point[] projectedPoints = new Point[SHIP_VERTICES.length];
         double[] depthValues = new double[SHIP_VERTICES.length];
+        double renderYaw = shipState.getYawDegrees() + RENDER_YAW_OFFSET_DEG + (flipShipOrientation ? 180.0 : 0.0);
         for (int i = 0; i < SHIP_VERTICES.length; i++) {
             double[] p = SHIP_VERTICES[i];
             double[] rotated = rotateXYZ(p[0], p[1], p[2],
                     shipState.getPitchDegrees(),
-                    shipState.getYawDegrees() + RENDER_YAW_OFFSET_DEG,
+                    renderYaw,
                     shipState.getRollDegrees());
 
             double cameraDistance = 7.4;
@@ -253,7 +256,7 @@ public class ShipPanel extends JPanel {
         if (firePrimaryActive) {
             double[] forward = rotateXYZ(0.0, 0.0, 1.0,
                     shipState.getPitchDegrees(),
-                    shipState.getYawDegrees() + RENDER_YAW_OFFSET_DEG,
+                    renderYaw,
                     shipState.getRollDegrees());
             int frontX = centerX + (int) Math.round((forward[0] * 3.8) * 260.0 / Math.max(1.0, forward[2] + 7.4));
             int frontY = centerY - (int) Math.round((forward[1] * 3.8) * 260.0 / Math.max(1.0, forward[2] + 7.4));
@@ -292,9 +295,9 @@ public class ShipPanel extends JPanel {
         Point tail = projectedPoints[9];
         g2d.setFont(new Font(Font.MONOSPACED, Font.BOLD, 12));
         g2d.setColor(new Color(255, 245, 120, 220));
-        g2d.drawString("FRONT", nose.x + 8, nose.y - 8);
+        g2d.drawString(flipShipOrientation ? "BACK" : "FRONT", nose.x + 8, nose.y - 8);
         g2d.setColor(new Color(255, 165, 120, 220));
-        g2d.drawString("BACK", tail.x + 8, tail.y + 14);
+        g2d.drawString(flipShipOrientation ? "FRONT" : "BACK", tail.x + 8, tail.y + 14);
     }
 
     private void drawFirePrimaryEffect(Graphics2D g2d, Point nose, Point projectileTarget) {
@@ -343,10 +346,11 @@ public class ShipPanel extends JPanel {
         g2d.drawString("Joystick access: " + joystickSnapshot.accessStatus(), x, y + lineHeight * 10);
         g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO") + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 11);
         g2d.drawString("Plane Render: " + (solidPlaneEnabled ? "Solid Retro Fill + Wireframe" : "Wireframe"), x, y + lineHeight * 12);
-        g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 13);
+        g2d.drawString("Ship Front: " + (flipShipOrientation ? "Tail (180° flipped)" : "Nose (default)"), x, y + lineHeight * 13);
+        g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 14);
         if (debugModeEnabled) {
             g2d.setColor(new Color(255, 170, 140));
-            g2d.drawString("DEBUG MODE", x, y + lineHeight * 14);
+            g2d.drawString("DEBUG MODE", x, y + lineHeight * 15);
         }
     }
 
