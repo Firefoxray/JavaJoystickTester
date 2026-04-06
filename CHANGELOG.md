@@ -19,6 +19,21 @@
 ### Fixed
 - Auto-update is now explicitly blocked when local uncommitted changes are present, with a friendly in-app message.
 
+## 0.1.5
+
+### Changed
+- Improved joystick auto-selection to prefer Thrustmaster T.16000M and deprioritize common virtual/non-flight devices in auto mode.
+- Added manual controller selection menu (`Settings -> Joystick Controller`) so users can pin a specific detected controller.
+- Improved HUD and controls dialog to make active input/controller explicit and list all detected controller names with active marker.
+- Kept keyboard fallback behavior unchanged when joystick is unavailable or keyboard mode is chosen.
+- Added joystick axis/button mapping options (pitch/yaw/roll/throttle axis selection plus trigger button/action binding).
+- Updated joystick steering to direct (Star-Fox-style) target control so stick movement drives ship attitude directly.
+- Reworked starfield animation so white star dots stream toward the camera, improving perceived forward ship motion.
+- Removed accidental sample multi-module leftovers so Gradle now runs as a single-module project.
+- Removed the generated `:app:run` "Hello World!" sample task/module path.
+- Added joystick access status text to both HUD and `Controls & Input Status...` dialog.
+- Updated README with Linux `/dev/input/event*` permission guidance and Fedora-specific troubleshooting notes.
+
 ## 0.1 Alpha
 
 ### Added
