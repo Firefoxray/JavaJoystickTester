@@ -2,6 +2,8 @@ package com.fire.javajoysticktester.input;
 
 import com.fire.javajoysticktester.model.ShipState;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +38,11 @@ public class InputSystem {
     private int triggerButtonIndex = 0;
     private JoystickButtonAction triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
 
+    private final Map<String, Map<Integer, String>> manualButtonMappings = new LinkedHashMap<>();
+    private Runnable settingsChangedListener = () -> {
+    };
+    private boolean suppressSettingsChangeNotifications;
+
     public InputSystem(KeyboardInput keyboardInput, JoystickInput joystickInput) {
         this.keyboardInput = keyboardInput;
         this.joystickInput = joystickInput;
@@ -59,8 +66,29 @@ public class InputSystem {
         }
     }
 
+    public void setSettingsChangedListener(Runnable settingsChangedListener) {
+        this.settingsChangedListener = settingsChangedListener == null ? () -> {
+        } : settingsChangedListener;
+    }
+
+    public void runWithoutSettingsNotifications(Runnable task) {
+        boolean previous = suppressSettingsChangeNotifications;
+        suppressSettingsChangeNotifications = true;
+        try {
+            task.run();
+        } finally {
+            suppressSettingsChangeNotifications = previous;
+        }
+    }
+
+    public JoystickSnapshot pollJoystickSnapshotNow() {
+        lastJoystickSnapshot = joystickInput.poll();
+        return lastJoystickSnapshot;
+    }
+
     public void setPreferredInputDevice(PreferredInputDevice preferredInputDevice) {
         this.preferredInputDevice = preferredInputDevice;
+        onSettingsChanged();
     }
 
     public PreferredInputDevice getPreferredInputDevice() {
@@ -77,6 +105,7 @@ public class InputSystem {
 
     public void setSelectedJoystickName(String selectedJoystickName) {
         joystickInput.setManualControllerSelection(selectedJoystickName);
+        onSettingsChanged();
     }
 
     public String getSelectedJoystickName() {
@@ -97,6 +126,7 @@ public class InputSystem {
 
     public void setPitchAxis(JoystickAxisOption pitchAxis) {
         this.pitchAxis = pitchAxis;
+        onSettingsChanged();
     }
 
     public JoystickAxisOption getYawAxis() {
@@ -105,6 +135,7 @@ public class InputSystem {
 
     public void setYawAxis(JoystickAxisOption yawAxis) {
         this.yawAxis = yawAxis;
+        onSettingsChanged();
     }
 
     public JoystickAxisOption getRollAxis() {
@@ -113,6 +144,7 @@ public class InputSystem {
 
     public void setRollAxis(JoystickAxisOption rollAxis) {
         this.rollAxis = rollAxis;
+        onSettingsChanged();
     }
 
     public JoystickAxisOption getThrottleAxis() {
@@ -121,6 +153,7 @@ public class InputSystem {
 
     public void setThrottleAxis(JoystickAxisOption throttleAxis) {
         this.throttleAxis = throttleAxis;
+        onSettingsChanged();
     }
 
     public boolean isInvertPitch() {
@@ -129,6 +162,7 @@ public class InputSystem {
 
     public void setInvertPitch(boolean invertPitch) {
         this.invertPitch = invertPitch;
+        onSettingsChanged();
     }
 
     public boolean isInvertYaw() {
@@ -137,6 +171,7 @@ public class InputSystem {
 
     public void setInvertYaw(boolean invertYaw) {
         this.invertYaw = invertYaw;
+        onSettingsChanged();
     }
 
     public boolean isInvertRoll() {
@@ -145,6 +180,7 @@ public class InputSystem {
 
     public void setInvertRoll(boolean invertRoll) {
         this.invertRoll = invertRoll;
+        onSettingsChanged();
     }
 
     public boolean isInvertThrottle() {
@@ -153,6 +189,7 @@ public class InputSystem {
 
     public void setInvertThrottle(boolean invertThrottle) {
         this.invertThrottle = invertThrottle;
+        onSettingsChanged();
     }
 
     public int getTriggerButtonIndex() {
@@ -161,6 +198,7 @@ public class InputSystem {
 
     public void setTriggerButtonIndex(int triggerButtonIndex) {
         this.triggerButtonIndex = Math.max(0, triggerButtonIndex);
+        onSettingsChanged();
     }
 
     public JoystickButtonAction getTriggerButtonAction() {
@@ -169,6 +207,110 @@ public class InputSystem {
 
     public void setTriggerButtonAction(JoystickButtonAction triggerButtonAction) {
         this.triggerButtonAction = triggerButtonAction;
+        onSettingsChanged();
+    }
+
+    public void setManualMappingForController(String controllerName, Map<Integer, String> mapping) {
+        if (controllerName == null || controllerName.isBlank()) {
+            return;
+        }
+        Map<Integer, String> sanitized = new LinkedHashMap<>();
+        for (Map.Entry<Integer, String> entry : mapping.entrySet()) {
+            if (entry.getKey() < 0 || entry.getValue() == null || entry.getValue().isBlank()) {
+                continue;
+            }
+            sanitized.put(entry.getKey(), entry.getValue());
+        }
+        if (sanitized.isEmpty()) {
+            manualButtonMappings.remove(controllerName);
+        } else {
+            manualButtonMappings.put(controllerName, sanitized);
+        }
+        onSettingsChanged();
+    }
+
+    public Map<Integer, String> getManualMappingForController(String controllerName) {
+        if (controllerName == null) {
+            return Map.of();
+        }
+        Map<Integer, String> mapping = manualButtonMappings.get(controllerName);
+        if (mapping == null) {
+            return Map.of();
+        }
+        return new LinkedHashMap<>(mapping);
+    }
+
+    public Map<String, Map<Integer, String>> getManualButtonMappings() {
+        Map<String, Map<Integer, String>> copy = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<Integer, String>> entry : manualButtonMappings.entrySet()) {
+            copy.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
+        }
+        return copy;
+    }
+
+    public void setManualButtonMappings(Map<String, Map<Integer, String>> mappings) {
+        manualButtonMappings.clear();
+        if (mappings != null) {
+            for (Map.Entry<String, Map<Integer, String>> entry : mappings.entrySet()) {
+                String controllerName = entry.getKey();
+                if (controllerName == null || controllerName.isBlank()) {
+                    continue;
+                }
+                Map<Integer, String> sanitized = new LinkedHashMap<>();
+                for (Map.Entry<Integer, String> mapEntry : entry.getValue().entrySet()) {
+                    if (mapEntry.getKey() < 0 || mapEntry.getValue() == null || mapEntry.getValue().isBlank()) {
+                        continue;
+                    }
+                    sanitized.put(mapEntry.getKey(), mapEntry.getValue());
+                }
+                if (!sanitized.isEmpty()) {
+                    manualButtonMappings.put(controllerName, sanitized);
+                }
+            }
+        }
+        onSettingsChanged();
+    }
+
+    public List<Integer> getLogicalButtonIndices(JoystickSnapshot snapshot) {
+        List<Integer> fromSnapshot = extractButtonIndices(snapshot.buttons());
+        Map<Integer, String> mapped = getManualMappingForController(snapshot.controllerName());
+        for (Integer idx : mapped.keySet()) {
+            if (!fromSnapshot.contains(idx)) {
+                fromSnapshot.add(idx);
+            }
+        }
+        fromSnapshot.sort(Integer::compareTo);
+        return fromSnapshot;
+    }
+
+    public boolean isLogicalButtonPressed(JoystickSnapshot snapshot, int targetButtonIndex) {
+        Map<Integer, String> mapping = getManualMappingForController(snapshot.controllerName());
+        if (mapping.containsKey(targetButtonIndex)) {
+            String mappedKey = mapping.get(targetButtonIndex);
+            return mappedKey != null && Boolean.TRUE.equals(snapshot.buttons().get(mappedKey));
+        }
+        return isButtonPressed(snapshot.buttons(), targetButtonIndex);
+    }
+
+    public void resetToDefaults() {
+        preferredInputDevice = PreferredInputDevice.AUTO;
+        joystickInput.setManualControllerSelection(null);
+
+        pitchAxis = JoystickAxisOption.Y;
+        yawAxis = JoystickAxisOption.X;
+        rollAxis = JoystickAxisOption.RZ;
+        throttleAxis = JoystickAxisOption.SLIDER;
+
+        invertPitch = false;
+        invertYaw = false;
+        invertRoll = false;
+        invertThrottle = false;
+
+        triggerButtonIndex = 0;
+        triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
+
+        manualButtonMappings.clear();
+        onSettingsChanged();
     }
 
     private void applyKeyboard(ShipState shipState, KeyboardInput.KeyboardSnapshot input, double deltaTimeSec) {
@@ -235,7 +377,7 @@ public class InputSystem {
             shipState.setThrottleTarget((-throttle + 1.0) * 0.5);
         }
 
-        if (isButtonPressed(snapshot.buttons(), triggerButtonIndex)) {
+        if (isLogicalButtonPressed(snapshot, triggerButtonIndex)) {
             applyTriggerAction(shipState, deltaTimeSec);
         }
     }
@@ -252,6 +394,17 @@ public class InputSystem {
             case BOOST -> shipState.addThrottleTarget(THROTTLE_UNITS_PER_SEC * deltaTimeSec * 2.5);
             case FIRE_PRIMARY -> shipState.addRollTarget(18.0 * deltaTimeSec);
         }
+    }
+
+    private static List<Integer> extractButtonIndices(Map<String, Boolean> buttons) {
+        List<Integer> out = new ArrayList<>();
+        for (String key : buttons.keySet()) {
+            Integer parsed = parseButtonIndex(key);
+            if (parsed != null && !out.contains(parsed)) {
+                out.add(parsed);
+            }
+        }
+        return out;
     }
 
     private static boolean isButtonPressed(Map<String, Boolean> buttons, int targetButtonIndex) {
@@ -320,5 +473,11 @@ public class InputSystem {
             }
         }
         return 0.0;
+    }
+
+    private void onSettingsChanged() {
+        if (!suppressSettingsChangeNotifications) {
+            settingsChangedListener.run();
+        }
     }
 }
