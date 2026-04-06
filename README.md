@@ -1,21 +1,24 @@
-# Java Joystick Tester (0.4 Alpha)
+# Java Joystick Tester (0.5 Alpha)
 
 A Swing/Java2D flight-input sandbox for testing keyboard and joystick controls against a ship HUD.
 
 ## Version
-Current version: `0.4 Alpha`
+Current version: `0.5 Alpha`
 
 ## What works in this version
 - Main entry point remains `com.fire.javajoysticktester.Main`.
 - Single-module Gradle application project (no sample `:app` module).
 - Keyboard fallback controls remain active and unchanged.
 - Joystick detection/polling via **JInput** with preferred-device + manual-controller selection.
-- Joystick axis mapping (pitch/yaw/roll/throttle), trigger action mapping, and axis inversion toggles.
-- **Manual full button mapping flow** (`Settings -> Joystick Mapping -> Map Buttons Manually...`) that walks `Button 0..N` and saves per-controller physical mappings.
-- **Reset to defaults** (`Settings -> Reset to Defaults...`) with confirmation and config wipe.
-- **Persistent config file** auto-load/save at `~/.java-joystick-tester/config.properties`.
-- HUD + side panel showing live axis values, controller status, and compact button states.
-- Starfield forward-flight background with respawn logic fixed to avoid long-term bottom-right drift/collapse.
+- Joystick axis mapping (pitch/yaw/roll/throttle), trigger action mapping, axis inversion toggles, and clearer flight-meaning labels.
+- **Fast button remapping flow** (`Settings -> Joystick Mapping -> Fast Remap All Buttons...`) with automatic next-button capture and cancel/escape support.
+- **Quick trigger remap** (`Listen and Set Trigger Button...`) using the same auto-listen flow.
+- **Persistent config file** auto-load/save at `~/.java-joystick-tester/config.properties` including visual toggles.
+- **Reset to defaults** (`Settings -> Reset to Defaults...`) with confirmation and config wipe/rewrite.
+- HUD + side panel showing live axis values, controller status, speed (MPH), and compact button states.
+- Motion-reactive starfield (forward, plus pitch/yaw/roll visual response) with respawn safeguards against drift/collapse.
+- Optional **solid retro plane mode** (Star Fox SNES-inspired flat fill) while preserving wireframe readability.
+- FIRE_PRIMARY red projectile/light effect while the fire button is held.
 - `Extras` menu includes update checks and desktop launcher installation.
 
 ## Run options
@@ -27,48 +30,48 @@ Current version: `0.4 Alpha`
 - `Preferred Input`: `Auto`, `Keyboard`, `Joystick`
 - `Joystick Controller`: auto-select (prefer T.16000M) or manually pin a detected device
 - `Joystick Mapping`
-  - Pitch/Yaw/Roll/Throttle axis selection
+  - Pitch/Yaw/Roll/Throttle mapping with explicit flight meanings
   - `Invert Axes` submenu
   - Trigger button selection and trigger action selection
-  - `Map Buttons Manually...` (step-by-step physical button capture)
+  - `Listen and Set Trigger Button...` (instant next-button capture)
+  - `Fast Remap All Buttons...` (full auto-listen mapping pass)
   - `Clear Manual Button Mapping`
 - `Controls & Input Status...`
   - active input/controller
   - mappings and invert state
+  - raw axis names vs flight meanings
   - manual button map for active controller
-  - axis meaning notes (`Z` vs `RZ`)
   - config file location
 - `Reset to Defaults...` clears in-memory settings and saved config values after confirmation
+
+### View
+- `Enable Solid Plane (retro fill)` toggle (wireframe remains available)
 
 ### Extras
 - `Check for Updates...`
 - `Install Desktop Launcher`
 
-## Manual button mapping details
-Manual mapping is intended as the source of truth when device-reported button identifiers are unreliable.
+## Flight-control meanings (plain language)
+- **Pitch** = nose up/down
+- **Yaw** = nose left/right
+- **Roll** = banking left/right
+- **Throttle** = speed control (HUD shows a game-style 100 to 1000 MPH)
 
-Flow:
-1. Open `Settings -> Joystick Mapping -> Map Buttons Manually...`
-2. The app determines the active controller's button count.
-3. It prompts through logical `Button 0`, `Button 1`, ... up to `Button N`.
-4. For each prompt, hold the desired physical button and click OK.
-5. Mapping is saved per controller name and reused on restart.
+## Fast remapping details
+The remapping flow now listens for the **next newly pressed button** and assigns immediately:
+1. Open `Settings -> Joystick Mapping -> Fast Remap All Buttons...`
+2. For each logical button step (`Button 0..N`), press one physical button.
+3. The app auto-detects and stores the mapping.
+4. Press `Esc` or click `Cancel` in the listening dialog to stop.
 
-This is especially useful for T.16000M layouts where backend button identifiers may vary by OS.
-
-## Z vs RZ axis note
-JInput axis names vary by platform/backend, but this app now labels options with likely flight-stick meaning:
-- `RZ` is commonly stick twist/yaw on devices like the T.16000M.
-- `Z` is commonly throttle/slider on many devices.
-
-Always verify with live `Raw axes` HUD readout, since exact labeling can differ.
+No more “hold button then click OK” requirement.
 
 ## Config persistence
 Settings are saved to:
 - `~/.java-joystick-tester/config.properties`
 
 Persisted values include preferred input mode, selected controller, axis mappings, invert toggles,
-trigger mapping/action, and manual button mapping data.
+trigger mapping/action, manual button mapping data, and visual toggles (including solid plane mode).
 
 If config is missing or invalid, the app safely falls back to defaults.
 

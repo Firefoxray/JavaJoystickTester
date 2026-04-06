@@ -26,11 +26,15 @@ import javax.swing.Timer;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import java.awt.BorderLayout;
+import java.awt.Dialog;
+import java.awt.FlowLayout;
+import java.awt.event.KeyEvent;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Main application frame.
@@ -108,10 +112,10 @@ public class MainWindow {
         });
 
         JMenu mappingMenu = new JMenu("Joystick Mapping");
-        addAxisBindingMenu(mappingMenu, "Pitch Axis", inputSystem::getPitchAxis, inputSystem::setPitchAxis);
-        addAxisBindingMenu(mappingMenu, "Yaw Axis", inputSystem::getYawAxis, inputSystem::setYawAxis);
-        addAxisBindingMenu(mappingMenu, "Roll Axis", inputSystem::getRollAxis, inputSystem::setRollAxis);
-        addAxisBindingMenu(mappingMenu, "Throttle Axis", inputSystem::getThrottleAxis, inputSystem::setThrottleAxis);
+        addAxisBindingMenu(mappingMenu, "Pitch (Nose Up/Down) Axis", inputSystem::getPitchAxis, inputSystem::setPitchAxis);
+        addAxisBindingMenu(mappingMenu, "Yaw (Nose Left/Right) Axis", inputSystem::getYawAxis, inputSystem::setYawAxis);
+        addAxisBindingMenu(mappingMenu, "Roll (Bank Left/Right) Axis", inputSystem::getRollAxis, inputSystem::setRollAxis);
+        addAxisBindingMenu(mappingMenu, "Throttle / Speed Axis", inputSystem::getThrottleAxis, inputSystem::setThrottleAxis);
 
         JMenu invertMenu = new JMenu("Invert Axes");
         invertMenu.add(addInvertToggle("Invert Pitch", inputSystem::isInvertPitch, inputSystem::setInvertPitch));
@@ -139,6 +143,9 @@ public class MainWindow {
             }
         });
         mappingMenu.add(triggerButtonMenu);
+        JMenuItem quickTriggerMapItem = new JMenuItem("Listen and Set Trigger Button...");
+        quickTriggerMapItem.addActionListener(e -> remapTriggerButton());
+        mappingMenu.add(quickTriggerMapItem);
 
         JMenu triggerActionMenu = new JMenu("Trigger Action");
         ButtonGroup triggerActions = new ButtonGroup();
@@ -150,7 +157,7 @@ public class MainWindow {
         }
         mappingMenu.add(triggerActionMenu);
 
-        JMenuItem manualMapButtonsItem = new JMenuItem("Map Buttons Manually...");
+        JMenuItem manualMapButtonsItem = new JMenuItem("Fast Remap All Buttons...");
         manualMapButtonsItem.addActionListener(e -> runManualButtonMapping());
         mappingMenu.addSeparator();
         mappingMenu.add(manualMapButtonsItem);
@@ -172,6 +179,12 @@ public class MainWindow {
         settingsMenu.addSeparator();
         settingsMenu.add(resetDefaultsItem);
         menuBar.add(settingsMenu);
+
+        JMenu viewMenu = new JMenu("View");
+        JCheckBoxMenuItem solidPlaneItem = new JCheckBoxMenuItem("Enable Solid Plane (retro fill)", inputSystem.isSolidPlaneEnabled());
+        solidPlaneItem.addActionListener(e -> inputSystem.setSolidPlaneEnabled(solidPlaneItem.isSelected()));
+        viewMenu.add(solidPlaneItem);
+        menuBar.add(viewMenu);
 
         JMenu extrasMenu = new JMenu("Extras");
         JMenuItem checkUpdatesItem = new JMenuItem("Check for Updates...");
@@ -367,7 +380,8 @@ public class MainWindow {
                 frame,
                 "Manual mapping for: " + snapshot.controllerName() + "\n"
                         + "This will prompt from Button 0 to Button " + (count - 1) + ".\n"
-                        + "For each step, press+hold the physical button then click OK.",
+                        + "Each step listens and auto-captures the next pressed button.\n"
+                        + "Use Cancel/Esc in the listening dialog to stop.",
                 "Manual Button Mapping",
                 JOptionPane.OK_CANCEL_OPTION,
                 JOptionPane.QUESTION_MESSAGE
@@ -379,30 +393,19 @@ public class MainWindow {
 
         Map<Integer, String> mapped = new LinkedHashMap<>();
         for (int logical = 0; logical < count; logical++) {
-            int stepChoice = JOptionPane.showConfirmDialog(
-                    frame,
-                    "Press and hold physical button for Button " + logical + " and click OK.\n"
-                            + "Cancel to finish early.",
-                    "Map Button " + logical,
-                    JOptionPane.OK_CANCEL_OPTION,
-                    JOptionPane.PLAIN_MESSAGE
-            );
-
-            if (stepChoice != JOptionPane.OK_OPTION) {
-                break;
-            }
-
             String selectedKey = captureButtonKeyForStep(logical);
             if (selectedKey == null) {
                 int retry = JOptionPane.showConfirmDialog(
                         frame,
                         "No new pressed button detected for Button " + logical + ". Retry this step?",
                         "Map Button " + logical,
-                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.YES_NO_CANCEL_OPTION,
                         JOptionPane.WARNING_MESSAGE
                 );
                 if (retry == JOptionPane.YES_OPTION) {
                     logical--;
+                } else if (retry == JOptionPane.CANCEL_OPTION) {
+                    break;
                 }
                 continue;
             }
@@ -427,9 +430,16 @@ public class MainWindow {
 
     private String captureButtonKeyForStep(int logical) {
         List<String> baselinePressed = pressedButtonKeys(inputSystem.pollJoystickSnapshotNow());
-        long deadlineMillis = System.currentTimeMillis() + 4000;
+        long deadlineMillis = System.currentTimeMillis() + 7000;
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        javax.swing.JDialog listeningDialog = buildListeningDialog(logical, cancelled);
+        SwingUtilities.invokeLater(() -> listeningDialog.setVisible(true));
 
         while (System.currentTimeMillis() < deadlineMillis) {
+            if (cancelled.get()) {
+                listeningDialog.dispose();
+                return null;
+            }
             JoystickSnapshot live = inputSystem.pollJoystickSnapshotNow();
             List<String> pressed = pressedButtonKeys(live);
             List<String> newlyPressed = new ArrayList<>();
@@ -440,6 +450,7 @@ public class MainWindow {
             }
 
             if (!newlyPressed.isEmpty()) {
+                listeningDialog.dispose();
                 if (newlyPressed.size() == 1) {
                     return newlyPressed.getFirst();
                 }
@@ -459,11 +470,71 @@ public class MainWindow {
                 Thread.sleep(30L);
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
+                listeningDialog.dispose();
                 return null;
             }
         }
 
+        listeningDialog.dispose();
         return null;
+    }
+
+    private javax.swing.JDialog buildListeningDialog(int logical, AtomicBoolean cancelled) {
+        javax.swing.JDialog dialog = new javax.swing.JDialog(frame, "Listening for Button " + logical, Dialog.ModalityType.MODELESS);
+        dialog.setLayout(new BorderLayout(8, 8));
+
+        javax.swing.JLabel label = new javax.swing.JLabel("Press the physical button for logical Button " + logical + "...");
+        label.setBorder(javax.swing.BorderFactory.createEmptyBorder(12, 12, 0, 12));
+        dialog.add(label, BorderLayout.NORTH);
+
+        javax.swing.JLabel hint = new javax.swing.JLabel("Auto-detecting next newly pressed button (Esc/Cancel to stop)");
+        hint.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 12, 4, 12));
+        dialog.add(hint, BorderLayout.CENTER);
+
+        javax.swing.JButton cancelButton = new javax.swing.JButton("Cancel");
+        cancelButton.addActionListener(e -> {
+            cancelled.set(true);
+            dialog.dispose();
+        });
+        javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(cancelButton);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+
+        dialog.getRootPane().registerKeyboardAction(
+                e -> {
+                    cancelled.set(true);
+                    dialog.dispose();
+                },
+                javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
+        dialog.pack();
+        dialog.setResizable(false);
+        dialog.setLocationRelativeTo(frame);
+        return dialog;
+    }
+
+    private void remapTriggerButton() {
+        JoystickSnapshot snapshot = inputSystem.getLastJoystickSnapshot();
+        if (!snapshot.connected()) {
+            JOptionPane.showMessageDialog(frame,
+                    "Connect/select a joystick first.",
+                    "Trigger Remap",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        String selectedKey = captureButtonKeyForStep(inputSystem.getTriggerButtonIndex());
+        Integer detectedIndex = parseButtonIndex(selectedKey);
+        if (detectedIndex == null) {
+            return;
+        }
+
+        inputSystem.setTriggerButtonIndex(detectedIndex);
+        JOptionPane.showMessageDialog(frame,
+                "Trigger remapped to Button " + detectedIndex + " (" + selectedKey + ").",
+                "Trigger Remap",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private static List<String> pressedButtonKeys(JoystickSnapshot snapshot) {
@@ -474,6 +545,29 @@ public class MainWindow {
             }
         }
         return pressed;
+    }
+
+    private static Integer parseButtonIndex(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (Character.isDigit(c)) {
+                digits.append(c);
+            } else if (!digits.isEmpty()) {
+                break;
+            }
+        }
+        if (digits.isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(digits.toString());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private void clearManualButtonMapping() {
@@ -504,7 +598,7 @@ public class MainWindow {
                 frame,
                 "Reset all settings to defaults?\n"
                         + "This clears preferred input, controller selection, axis/trigger mappings,\n"
-                        + "invert flags, manual button maps, and saved config values.",
+                        + "invert flags, manual button maps, visual toggles, and saved config values.",
                 "Reset to Defaults",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE
@@ -532,6 +626,11 @@ public class MainWindow {
         for (Map.Entry<String, String> binding : KeyboardInput.getBindingDescriptions().entrySet()) {
             text.append(" - ").append(binding.getKey()).append(": ").append(binding.getValue()).append("\n");
         }
+        text.append("\nFlight control quick guide:\n");
+        text.append(" - Pitch = nose up/down\n");
+        text.append(" - Yaw = nose left/right\n");
+        text.append(" - Roll = bank left/right\n");
+        text.append(" - Throttle = speed control (100 to 1000 MPH HUD range)\n");
 
         text.append("\nInput status:\n");
         text.append(" - Preferred input: ").append(inputSystem.getPreferredInputDevice()).append("\n");
@@ -544,16 +643,17 @@ public class MainWindow {
         text.append(" - T.16000M detected: ").append(snapshot.thrustmasterT16000MDetected() ? "YES" : "NO").append("\n");
 
         text.append("\nJoystick mapping:\n");
-        text.append(" - Pitch axis: ").append(inputSystem.getPitchAxis().label())
+        text.append(" - Pitch axis (nose up/down): ").append(inputSystem.getPitchAxis().label())
                 .append(inputSystem.isInvertPitch() ? " (inverted)" : "").append("\n");
-        text.append(" - Yaw axis: ").append(inputSystem.getYawAxis().label())
+        text.append(" - Yaw axis (nose left/right): ").append(inputSystem.getYawAxis().label())
                 .append(inputSystem.isInvertYaw() ? " (inverted)" : "").append("\n");
-        text.append(" - Roll axis: ").append(inputSystem.getRollAxis().label())
+        text.append(" - Roll axis (bank left/right): ").append(inputSystem.getRollAxis().label())
                 .append(inputSystem.isInvertRoll() ? " (inverted)" : "").append("\n");
-        text.append(" - Throttle axis: ").append(inputSystem.getThrottleAxis().label())
+        text.append(" - Throttle axis (speed): ").append(inputSystem.getThrottleAxis().label())
                 .append(inputSystem.isInvertThrottle() ? " (inverted)" : "").append("\n");
         text.append(" - Trigger: Button ").append(inputSystem.getTriggerButtonIndex())
                 .append(" -> ").append(inputSystem.getTriggerButtonAction()).append("\n");
+        text.append(" - Plane mode: ").append(inputSystem.isSolidPlaneEnabled() ? "Solid retro fill + wireframe" : "Wireframe").append("\n");
 
         Map<Integer, String> manualMap = inputSystem.getManualMappingForController(snapshot.controllerName());
         text.append("\nManual button mapping (source of truth when present):\n");
@@ -565,9 +665,11 @@ public class MainWindow {
             }
         }
 
-        text.append("\nAxis meaning notes:\n");
-        text.append(" - RZ is commonly joystick twist (yaw) on flight sticks like T.16000M.\n");
-        text.append(" - Z is often a throttle/slider axis on many controllers/backends.\n");
+        text.append("\nAxis meaning notes (raw names vary by OS/backend):\n");
+        text.append(" - Y is usually stick forward/back -> commonly pitch.\n");
+        text.append(" - X is usually stick left/right -> commonly yaw or roll.\n");
+        text.append(" - RZ is commonly stick twist -> commonly yaw on flight sticks like T.16000M.\n");
+        text.append(" - Z/Slider are often throttle controls.\n");
         text.append(" - Exact names can vary by OS/backend; check Raw axes in HUD for live labels.\n");
 
         text.append("\nConfig:\n");

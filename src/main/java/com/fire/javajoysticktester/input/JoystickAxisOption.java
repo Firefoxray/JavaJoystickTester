@@ -1,12 +1,12 @@
 package com.fire.javajoysticktester.input;
 
 public enum JoystickAxisOption {
-    AUTO("Auto"),
-    X("X (left/right)"),
-    Y("Y (forward/back)"),
-    Z("Z (throttle/slider on many devices)"),
-    RZ("RZ (twist/yaw on many flight sticks)"),
-    SLIDER("Slider/Throttle"),
+    AUTO("Auto (use common flight-stick defaults)"),
+    X("Raw X axis (stick left/right)"),
+    Y("Raw Y axis (stick forward/back, usually pitch)"),
+    Z("Raw Z axis (often throttle/slider)"),
+    RZ("Raw RZ axis (often twist yaw)"),
+    SLIDER("Raw Slider axis (throttle)"),
     NONE("None");
 
     private final String label;
