@@ -61,6 +61,7 @@ public class AppConfigManager {
                 inputSystem.setInvertThrottle(Boolean.parseBoolean(properties.getProperty("invert.throttle", "false")));
 
                 inputSystem.setTriggerButtonIndex(parseInt(properties.getProperty("trigger.button"), 0));
+                inputSystem.setBoostButtonIndex(parseInt(properties.getProperty("boost.button"), 1));
                 inputSystem.setTriggerButtonAction(parseEnum(properties.getProperty("trigger.action"), JoystickButtonAction.class, JoystickButtonAction.FIRE_PRIMARY));
                 inputSystem.setSolidPlaneEnabled(Boolean.parseBoolean(properties.getProperty("visual.solid_plane", "true")));
                 inputSystem.setDebugModeEnabled(Boolean.parseBoolean(properties.getProperty("visual.debug_mode", "false")));
@@ -91,6 +92,7 @@ public class AppConfigManager {
         properties.setProperty("invert.throttle", Boolean.toString(inputSystem.isInvertThrottle()));
 
         properties.setProperty("trigger.button", Integer.toString(inputSystem.getTriggerButtonIndex()));
+        properties.setProperty("boost.button", Integer.toString(inputSystem.getBoostButtonIndex()));
         properties.setProperty("trigger.action", inputSystem.getTriggerButtonAction().name());
         properties.setProperty("visual.solid_plane", Boolean.toString(inputSystem.isSolidPlaneEnabled()));
         properties.setProperty("visual.debug_mode", Boolean.toString(inputSystem.isDebugModeEnabled()));
