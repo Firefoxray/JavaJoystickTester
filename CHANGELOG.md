@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.2 Alpha
+
+### Added
+- Added in-app update menu: `Updates -> Check for Updates...`.
+- Added `GitUpdateService` to encapsulate Git-based update checks and update execution with restart attempt via `ProcessBuilder`.
+
+### Changed
+- Bumped project/app version from `0.1 Alpha` to `0.2 Alpha` across `VERSION`, Gradle metadata, README, and in-app header strings.
+- Update dialogs now show current branch, short commit hash, and clear status outcomes (`up to date`, `update available`, `unable to check`, `working tree dirty`).
+- Update flow now prompts for confirmation before update; choosing `Yes` performs `git pull --ff-only` on the current branch and attempts app restart, while choosing `No` returns to the app.
+- Added robust update checks for dirty working tree, detached HEAD, missing upstream, non-Git execution context, fetch failures, and other Git command errors.
+- Added asynchronous menu-driven update check/update calls so UI remains responsive while Git commands run.
+- Added/retained visual HUD improvements from the previous pass: denser starfield, clearer forward-facing ship nose/cockpit cues, and side-panel live button states by index for active controller.
+
+### Fixed
+- Auto-update is now explicitly blocked when local uncommitted changes are present, with a friendly in-app message.
+
+## 0.1.5
+
 ### Changed
 - Improved joystick auto-selection to prefer Thrustmaster T.16000M and deprioritize common virtual/non-flight devices in auto mode.
 - Added manual controller selection menu (`Settings -> Joystick Controller`) so users can pin a specific detected controller.
@@ -14,9 +33,6 @@
 - Removed the generated `:app:run` "Hello World!" sample task/module path.
 - Added joystick access status text to both HUD and `Controls & Input Status...` dialog.
 - Updated README with Linux `/dev/input/event*` permission guidance and Fedora-specific troubleshooting notes.
-
-### Fixed
-- Added Linux permission diagnostics for unreadable `/dev/input/event*` nodes and surfaced a friendly in-app hint when joystick access likely fails due to permissions.
 
 ## 0.1 Alpha
 

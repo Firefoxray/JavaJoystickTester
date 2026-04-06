@@ -12,6 +12,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.RenderingHints;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 
@@ -20,7 +22,7 @@ import java.util.StringJoiner;
  */
 public class ShipPanel extends JPanel {
     private static final double[][] SHIP_VERTICES = {
-            {0.00, 0.00, 2.10},
+            {0.00, 0.00, 2.55},
             {-0.35, 0.12, 0.90},
             {0.35, 0.12, 0.90},
             {-0.35, -0.12, 0.90},
@@ -29,7 +31,8 @@ public class ShipPanel extends JPanel {
             {1.35, -0.05, -0.40},
             {0.00, 0.36, -0.55},
             {0.00, -0.36, -0.55},
-            {0.00, 0.00, -1.25}
+            {0.00, 0.00, -1.25},
+            {0.00, 0.24, 1.55}
     };
 
     private static final int[][] SHIP_EDGES = {
@@ -37,9 +40,11 @@ public class ShipPanel extends JPanel {
             {1, 2}, {3, 4}, {1, 3}, {2, 4},
             {3, 5}, {4, 6}, {5, 6},
             {1, 7}, {2, 7}, {3, 8}, {4, 8},
-            {5, 9}, {6, 9}, {7, 9}, {8, 9}
+            {5, 9}, {6, 9}, {7, 9}, {8, 9},
+            {0, 10}, {1, 10}, {2, 10}
     };
 
+    private static final int STAR_COUNT = 220;
     private static final double[][] STAR_FIELD = buildStars();
 
     private final ShipState shipState;
@@ -74,6 +79,7 @@ public class ShipPanel extends JPanel {
             drawBackgroundReferences(g2d);
             drawShipWireframe(g2d);
             drawHudText(g2d);
+            drawButtonPanel(g2d);
         } finally {
             g2d.dispose();
         }
@@ -163,9 +169,12 @@ public class ShipPanel extends JPanel {
             g2d.drawLine(a.x, a.y, b.x, b.y);
         }
 
-        g2d.setColor(new Color(180, 250, 255));
+        g2d.setColor(new Color(200, 250, 255));
         Point nose = projectedPoints[0];
-        g2d.fillOval(nose.x - 3, nose.y - 3, 6, 6);
+        Point centerBody = projectedPoints[9];
+        g2d.setStroke(new BasicStroke(2.4f));
+        g2d.drawLine(centerBody.x, centerBody.y, nose.x, nose.y);
+        g2d.fillOval(nose.x - 4, nose.y - 4, 8, 8);
     }
 
     private void drawHudText(Graphics2D g2d) {
@@ -176,7 +185,7 @@ public class ShipPanel extends JPanel {
         int lineHeight = 18;
 
         g2d.setColor(new Color(220, 240, 255));
-        g2d.drawString("Java Joystick Tester (0.1 Alpha)", x, y);
+        g2d.drawString("Java Joystick Tester (0.2 Alpha)", x, y);
 
         g2d.setColor(new Color(170, 220, 255));
         g2d.drawString(String.format("Pitch: %7.2f°  (target %7.2f°)", shipState.getPitchDegrees(), shipState.getTargetPitchDegrees()), x, y + lineHeight);
@@ -189,10 +198,123 @@ public class ShipPanel extends JPanel {
         g2d.drawString("Settings menu: choose input, controller, mapping", x, y + lineHeight * 7);
 
         g2d.drawString("Preferred Input: " + preferredInputDevice + " | Active: " + activeInputDescription, x, y + lineHeight * 8);
-        g2d.drawString("Joystick: " + (joystickSnapshot.connected() ? joystickSnapshot.controllerName() : "Not connected") + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 9);
-        g2d.drawString("Joystick access: " + joystickSnapshot.accessStatus(), x, y + lineHeight * 10);
-        g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO"), x, y + lineHeight * 11);
-        g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 12);
+        g2d.drawString("Joystick access: " + joystickSnapshot.accessStatus(), x, y + lineHeight * 9);
+        g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO") + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 10);
+        g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 11);
+    }
+
+    private void drawButtonPanel(Graphics2D g2d) {
+        int panelWidth = 260;
+        int panelHeight = Math.max(180, getHeight() - 32);
+        int panelX = getWidth() - panelWidth - 16;
+        int panelY = 16;
+
+        g2d.setColor(new Color(12, 22, 40, 190));
+        g2d.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 14, 14);
+        g2d.setColor(new Color(90, 160, 220, 180));
+        g2d.setStroke(new BasicStroke(1.2f));
+        g2d.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 14, 14);
+
+        int x = panelX + 12;
+        int y = panelY + 22;
+
+        g2d.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+        g2d.setColor(new Color(220, 240, 255));
+        g2d.drawString("Controller Buttons", x, y);
+
+        g2d.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+        String controllerName = joystickSnapshot.connected() ? joystickSnapshot.controllerName() : "No controller";
+        g2d.setColor(new Color(160, 210, 245));
+        g2d.drawString(controllerName, x, y + 17);
+
+        List<Integer> buttonIndices = extractButtonIndices(joystickSnapshot.buttons());
+        if (buttonIndices.isEmpty()) {
+            g2d.setColor(new Color(170, 190, 210));
+            g2d.drawString("No digital buttons reported.", x, y + 42);
+            return;
+        }
+
+        int top = y + 30;
+        int cols = 4;
+        int cellWidth = (panelWidth - 24) / cols;
+        int cellHeight = 24;
+
+        for (int i = 0; i < buttonIndices.size(); i++) {
+            int index = buttonIndices.get(i);
+            int col = i % cols;
+            int row = i / cols;
+            int cellX = x + col * cellWidth;
+            int cellY = top + row * (cellHeight + 6);
+
+            if (cellY + cellHeight > panelY + panelHeight - 8) {
+                g2d.setColor(new Color(170, 190, 210));
+                g2d.drawString("...", x, panelY + panelHeight - 10);
+                break;
+            }
+
+            boolean pressed = isButtonIndexPressed(joystickSnapshot.buttons(), index);
+            Color fill = pressed ? new Color(70, 200, 120, 210) : new Color(35, 55, 85, 180);
+            Color border = pressed ? new Color(150, 255, 180, 230) : new Color(120, 170, 210, 140);
+
+            g2d.setColor(fill);
+            g2d.fillRoundRect(cellX, cellY, cellWidth - 8, cellHeight, 8, 8);
+            g2d.setColor(border);
+            g2d.drawRoundRect(cellX, cellY, cellWidth - 8, cellHeight, 8, 8);
+
+            g2d.setColor(new Color(235, 245, 255));
+            g2d.drawString("B" + index, cellX + 8, cellY + 16);
+        }
+    }
+
+    private static List<Integer> extractButtonIndices(Map<String, Boolean> buttons) {
+        List<Integer> out = new ArrayList<>();
+        for (String key : buttons.keySet()) {
+            Integer parsed = parseButtonIndex(key);
+            if (parsed != null && !out.contains(parsed)) {
+                out.add(parsed);
+            }
+        }
+        out.sort(Integer::compareTo);
+        return out;
+    }
+
+    private static boolean isButtonIndexPressed(Map<String, Boolean> buttons, int targetButtonIndex) {
+        for (Map.Entry<String, Boolean> entry : buttons.entrySet()) {
+            if (!entry.getValue()) {
+                continue;
+            }
+            Integer parsed = parseButtonIndex(entry.getKey());
+            if (parsed != null && parsed == targetButtonIndex) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Integer parseButtonIndex(String raw) {
+        if (raw == null) {
+            return null;
+        }
+
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (Character.isDigit(c)) {
+                digits.append(c);
+            } else if (digits.length() > 0) {
+                break;
+            }
+        }
+
+        if (digits.length() == 0) {
+            return null;
+        }
+
+        try {
+            return Integer.parseInt(digits.toString());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private static String formatAxes(Map<String, Float> axes) {
@@ -212,9 +334,8 @@ public class ShipPanel extends JPanel {
     }
 
     private static double[][] buildStars() {
-        int starCount = 120;
-        double[][] stars = new double[starCount][4];
-        for (int i = 0; i < starCount; i++) {
+        double[][] stars = new double[STAR_COUNT][4];
+        for (int i = 0; i < STAR_COUNT; i++) {
             resetStar(stars[i], i);
         }
         return stars;
