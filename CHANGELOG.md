@@ -3,6 +3,16 @@
 ## Unreleased
 - No unreleased entries at this time.
 
+## 0.9
+
+### Added
+- Added click-to-remap interaction on the right-side controller button panel: clicking any logical button tile now starts the same physical-button listening prompt for that logical button.
+
+### Changed
+- Bumped project/app version references from `0.8` to `0.9` across `VERSION`, Gradle metadata, README, and shared app constants.
+- Updated solid ship face colors so each ship panel uses a distinct color for stronger visual separation.
+- Increased starfield forward motion and boost multiplier so stars move noticeably faster at all throttle settings, including around `100 MPH`.
+
 ## 0.8
 
 ### Changed
