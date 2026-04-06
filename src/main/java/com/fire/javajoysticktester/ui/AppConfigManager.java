@@ -64,6 +64,7 @@ public class AppConfigManager {
                 inputSystem.setBoostButtonIndex(parseInt(properties.getProperty("boost.button"), 1));
                 inputSystem.setTriggerButtonAction(parseEnum(properties.getProperty("trigger.action"), JoystickButtonAction.class, JoystickButtonAction.FIRE_PRIMARY));
                 inputSystem.setSolidPlaneEnabled(Boolean.parseBoolean(properties.getProperty("visual.solid_plane", "true")));
+                inputSystem.setFlipShipOrientation(Boolean.parseBoolean(properties.getProperty("visual.flip_ship_180", "false")));
                 inputSystem.setDebugModeEnabled(Boolean.parseBoolean(properties.getProperty("visual.debug_mode", "false")));
 
                 inputSystem.setManualButtonMappings(parseManualMappings(properties));
@@ -95,6 +96,7 @@ public class AppConfigManager {
         properties.setProperty("boost.button", Integer.toString(inputSystem.getBoostButtonIndex()));
         properties.setProperty("trigger.action", inputSystem.getTriggerButtonAction().name());
         properties.setProperty("visual.solid_plane", Boolean.toString(inputSystem.isSolidPlaneEnabled()));
+        properties.setProperty("visual.flip_ship_180", Boolean.toString(inputSystem.isFlipShipOrientation()));
         properties.setProperty("visual.debug_mode", Boolean.toString(inputSystem.isDebugModeEnabled()));
 
         for (Map.Entry<String, Map<Integer, String>> controllerEntry : inputSystem.getManualButtonMappings().entrySet()) {

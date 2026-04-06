@@ -12,12 +12,15 @@ import com.fire.javajoysticktester.model.ShipState;
 import com.fire.javajoysticktester.render.ShipPanel;
 import com.fire.javajoysticktester.update.GitUpdateService;
 
+import javax.swing.AbstractButton;
 import javax.swing.ButtonGroup;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.MenuElement;
+import javax.swing.MenuSelectionManager;
 import javax.swing.JOptionPane;
 import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JTextArea;
@@ -172,7 +175,7 @@ public class MainWindow {
         ButtonGroup triggerActions = new ButtonGroup();
         for (JoystickButtonAction action : JoystickButtonAction.values()) {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(action.name(), action == inputSystem.getTriggerButtonAction());
-            item.addActionListener(e -> inputSystem.setTriggerButtonAction(action));
+            addStayOpenAction(item, () -> inputSystem.setTriggerButtonAction(action));
             triggerActions.add(item);
             triggerActionMenu.add(item);
         }
@@ -207,7 +210,7 @@ public class MainWindow {
         controlsItem.addActionListener(e -> showControlsDialog());
 
         JCheckBoxMenuItem debugModeItem = new JCheckBoxMenuItem("Debug Mode", inputSystem.isDebugModeEnabled());
-        debugModeItem.addActionListener(e -> {
+        addStayOpenAction(debugModeItem, () -> {
             boolean enabled = debugModeItem.isSelected();
             inputSystem.setDebugModeEnabled(enabled);
             inputSystem.setSolidPlaneEnabled(!enabled);
@@ -227,8 +230,11 @@ public class MainWindow {
 
         JMenu viewMenu = new JMenu("View");
         JCheckBoxMenuItem solidPlaneItem = new JCheckBoxMenuItem("Enable Solid Plane (retro fill)", inputSystem.isSolidPlaneEnabled());
-        solidPlaneItem.addActionListener(e -> inputSystem.setSolidPlaneEnabled(solidPlaneItem.isSelected()));
+        addStayOpenAction(solidPlaneItem, () -> inputSystem.setSolidPlaneEnabled(solidPlaneItem.isSelected()));
+        JCheckBoxMenuItem flipShipItem = new JCheckBoxMenuItem("Flip Ship 180° (tail is front)", inputSystem.isFlipShipOrientation());
+        addStayOpenAction(flipShipItem, () -> inputSystem.setFlipShipOrientation(flipShipItem.isSelected()));
         viewMenu.add(solidPlaneItem);
+        viewMenu.add(flipShipItem);
         menuBar.add(viewMenu);
 
         JMenu extrasMenu = new JMenu("Extras");
@@ -248,7 +254,7 @@ public class MainWindow {
                                               java.util.function.BooleanSupplier getter,
                                               java.util.function.Consumer<Boolean> setter) {
         JCheckBoxMenuItem item = new JCheckBoxMenuItem(label, getter.getAsBoolean());
-        item.addActionListener(e -> setter.accept(item.isSelected()));
+        addStayOpenAction(item, () -> setter.accept(item.isSelected()));
         return item;
     }
 
@@ -334,7 +340,7 @@ public class MainWindow {
         ButtonGroup group = new ButtonGroup();
         for (JoystickAxisOption option : JoystickAxisOption.values()) {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(option.label(), getter.get() == option);
-            item.addActionListener(e -> setter.accept(option));
+            addStayOpenAction(item, () -> setter.accept(option));
             group.add(item);
             axisMenu.add(item);
         }
@@ -343,7 +349,7 @@ public class MainWindow {
 
     private JRadioButtonMenuItem addInputSelection(ButtonGroup group, String label, PreferredInputDevice device, boolean selected) {
         JRadioButtonMenuItem item = new JRadioButtonMenuItem(label, selected);
-        item.addActionListener(e -> inputSystem.setPreferredInputDevice(device));
+        addStayOpenAction(item, () -> inputSystem.setPreferredInputDevice(device));
         group.add(item);
         return item;
     }
@@ -356,7 +362,7 @@ public class MainWindow {
         String activeController = inputSystem.getLastJoystickSnapshot().controllerName();
 
         JRadioButtonMenuItem autoSelect = new JRadioButtonMenuItem("Auto-select (prefer T.16000M)", manualSelection == null);
-        autoSelect.addActionListener(e -> inputSystem.setSelectedJoystickName(null));
+        addStayOpenAction(autoSelect, () -> inputSystem.setSelectedJoystickName(null));
         group.add(autoSelect);
         joystickMenu.add(autoSelect);
 
@@ -374,7 +380,7 @@ public class MainWindow {
             boolean isActive = name.equals(activeController);
             String label = isActive ? name + "  [ACTIVE]" : name;
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(label, name.equals(manualSelection));
-            item.addActionListener(e -> inputSystem.setSelectedJoystickName(name));
+            addStayOpenAction(item, () -> inputSystem.setSelectedJoystickName(name));
             group.add(item);
             joystickMenu.add(item);
         }
@@ -388,7 +394,7 @@ public class MainWindow {
         for (Integer index : indices) {
             int buttonIndex = index;
             JRadioButtonMenuItem item = new JRadioButtonMenuItem("Button " + buttonIndex, buttonIndex == inputSystem.getTriggerButtonIndex());
-            item.addActionListener(e -> inputSystem.setTriggerButtonIndex(buttonIndex));
+            addStayOpenAction(item, () -> inputSystem.setTriggerButtonIndex(buttonIndex));
             group.add(item);
             triggerButtonMenu.add(item);
         }
@@ -402,10 +408,20 @@ public class MainWindow {
         for (Integer index : indices) {
             int buttonIndex = index;
             JRadioButtonMenuItem item = new JRadioButtonMenuItem("Button " + buttonIndex, buttonIndex == inputSystem.getBoostButtonIndex());
-            item.addActionListener(e -> inputSystem.setBoostButtonIndex(buttonIndex));
+            addStayOpenAction(item, () -> inputSystem.setBoostButtonIndex(buttonIndex));
             group.add(item);
             boostButtonMenu.add(item);
         }
+    }
+
+    private void addStayOpenAction(AbstractButton item, Runnable action) {
+        item.addActionListener(e -> {
+            MenuElement[] menuPath = MenuSelectionManager.defaultManager().getSelectedPath();
+            action.run();
+            if (menuPath.length > 0) {
+                SwingUtilities.invokeLater(() -> MenuSelectionManager.defaultManager().setSelectedPath(menuPath));
+            }
+        });
     }
 
     private void rebuildPerButtonRemapMenu(JMenu remapMenu) {
@@ -607,6 +623,7 @@ public class MainWindow {
         text.append(" - Boost button: Button ").append(inputSystem.getBoostButtonIndex()).append("\n");
         text.append(" - Debug mode: ").append(inputSystem.isDebugModeEnabled() ? "ON" : "OFF").append("\n");
         text.append(" - Plane mode: ").append(inputSystem.isSolidPlaneEnabled() ? "Solid retro fill + wireframe" : "Wireframe").append("\n");
+        text.append(" - Ship front: ").append(inputSystem.isFlipShipOrientation() ? "Tail (180° flipped)" : "Nose (default)").append("\n");
 
         Map<Integer, String> manualMap = inputSystem.getManualMappingForController(snapshot.controllerName());
         text.append("\nManual button mapping (source of truth when present):\n");

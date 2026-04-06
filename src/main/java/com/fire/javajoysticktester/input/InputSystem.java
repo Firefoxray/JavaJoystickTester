@@ -39,6 +39,7 @@ public class InputSystem {
     private int boostButtonIndex = 1;
     private JoystickButtonAction triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
     private boolean solidPlaneEnabled = true;
+    private boolean flipShipOrientation;
     private boolean debugModeEnabled;
     private boolean firePrimaryActive;
     private boolean boostActive;
@@ -138,6 +139,15 @@ public class InputSystem {
 
     public boolean isDebugModeEnabled() {
         return debugModeEnabled;
+    }
+
+    public boolean isFlipShipOrientation() {
+        return flipShipOrientation;
+    }
+
+    public void setFlipShipOrientation(boolean flipShipOrientation) {
+        this.flipShipOrientation = flipShipOrientation;
+        onSettingsChanged();
     }
 
     public void setDebugModeEnabled(boolean debugModeEnabled) {
@@ -364,6 +374,7 @@ public class InputSystem {
         boostButtonIndex = 1;
         triggerButtonAction = JoystickButtonAction.FIRE_PRIMARY;
         solidPlaneEnabled = true;
+        flipShipOrientation = false;
         debugModeEnabled = false;
 
         manualButtonMappings.clear();
