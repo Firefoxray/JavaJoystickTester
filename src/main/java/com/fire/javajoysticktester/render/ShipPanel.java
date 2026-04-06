@@ -70,6 +70,11 @@ public class ShipPanel extends JPanel {
     private InputSystem inputSystem;
     private boolean solidPlaneEnabled;
     private boolean firePrimaryActive;
+    private boolean boostActive;
+    private boolean debugModeEnabled;
+    private double lastPitchDegrees;
+    private double lastYawDegrees;
+    private double lastRollDegrees;
 
     private long lastStarNanos = System.nanoTime();
     private long starRespawnCounter = 1009;
@@ -92,6 +97,8 @@ public class ShipPanel extends JPanel {
         this.inputSystem = inputSystem;
         this.solidPlaneEnabled = inputSystem != null && inputSystem.isSolidPlaneEnabled();
         this.firePrimaryActive = inputSystem != null && inputSystem.isFirePrimaryActive();
+        this.boostActive = inputSystem != null && inputSystem.isBoostActive();
+        this.debugModeEnabled = inputSystem != null && inputSystem.isDebugModeEnabled();
     }
 
     @Override
@@ -126,14 +133,22 @@ public class ShipPanel extends JPanel {
         double deltaSec = Math.max(0.0, (now - lastStarNanos) / 1_000_000_000.0);
         lastStarNanos = now;
 
-        double speed = 0.7 + shipState.getThrottle() * 3.8;
-        double yawShift = (shipState.getYawDegrees() / 55.0) * 210.0;
-        double pitchShift = (shipState.getPitchDegrees() / 42.0) * 185.0;
-        double rollShift = (shipState.getRollDegrees() / 70.0) * 90.0;
+        double yawDelta = shortestAngleDelta(lastYawDegrees, shipState.getYawDegrees());
+        double pitchDelta = shortestAngleDelta(lastPitchDegrees, shipState.getPitchDegrees());
+        double rollDelta = shortestAngleDelta(lastRollDegrees, shipState.getRollDegrees());
+        lastYawDegrees = shipState.getYawDegrees();
+        lastPitchDegrees = shipState.getPitchDegrees();
+        lastRollDegrees = shipState.getRollDegrees();
+
+        double boostMultiplier = boostActive ? 2.6 : 1.0;
+        double speed = (0.7 + shipState.getThrottle() * 3.8) * boostMultiplier;
+        double yawShift = yawDelta * 165.0;
+        double pitchShift = pitchDelta * 150.0;
+        double rollShift = rollDelta * 80.0;
         for (double[] star : STAR_FIELD) {
             star[2] -= deltaSec * speed;
-            star[0] -= deltaSec * (yawShift + rollShift);
-            star[1] += deltaSec * pitchShift;
+            star[0] -= yawShift + rollShift;
+            star[1] += pitchShift - rollShift * 0.35;
             if (star[2] <= 0.08) {
                 starRespawnCounter += 7919;
                 resetStar(star, (int) (starRespawnCounter & 0x7FFFFFFF));
@@ -151,8 +166,9 @@ public class ShipPanel extends JPanel {
 
             int x = centerX + (int) Math.round(star[0] * perspective);
             int y = centerY + (int) Math.round(star[1] * perspective);
-            int trailX = centerX + (int) Math.round(star[0] * (1.0 / (depth + 0.085)));
-            int trailY = centerY + (int) Math.round(star[1] * (1.0 / (depth + 0.085)));
+            double trailOffset = boostActive ? 0.18 : 0.085;
+            int trailX = centerX + (int) Math.round(star[0] * (1.0 / (depth + trailOffset)));
+            int trailY = centerY + (int) Math.round(star[1] * (1.0 / (depth + trailOffset)));
 
             if (x < 0 || x >= width || y < 0 || y >= height) {
                 continue;
@@ -160,10 +176,13 @@ public class ShipPanel extends JPanel {
 
             int shade = (int) Math.round(145 + (1.0 - depth) * 105);
             int alpha = (int) Math.round(120 + (1.0 - depth) * 110);
-            g2d.setColor(new Color(shade, shade, 255, Math.max(70, Math.min(alpha, 240))));
+            Color starColor = boostActive
+                    ? new Color(Math.min(255, shade + 20), Math.min(255, shade + 35), 255, Math.max(70, Math.min(alpha + 30, 255)))
+                    : new Color(shade, shade, 255, Math.max(70, Math.min(alpha, 240)));
+            g2d.setColor(starColor);
 
-            if (depth < 0.58) {
-                g2d.setStroke(new BasicStroke(depth < 0.28 ? 1.9f : 1.2f));
+            if (depth < (boostActive ? 0.9 : 0.58)) {
+                g2d.setStroke(new BasicStroke(depth < 0.28 ? 2.6f : (boostActive ? 1.8f : 1.2f)));
                 g2d.drawLine(trailX, trailY, x, y);
             }
 
@@ -225,8 +244,18 @@ public class ShipPanel extends JPanel {
         g2d.drawLine(centerBody.x, centerBody.y, nose.x, nose.y);
         g2d.fillOval(nose.x - 4, nose.y - 4, 8, 8);
 
+        if (debugModeEnabled) {
+            drawDebugShipLabels(g2d, projectedPoints);
+        }
+
         if (firePrimaryActive) {
-            drawFirePrimaryEffect(g2d, nose, centerBody);
+            double[] forward = rotateXYZ(0.0, 0.0, 1.0,
+                    shipState.getPitchDegrees(),
+                    shipState.getYawDegrees(),
+                    shipState.getRollDegrees());
+            int frontX = centerX + (int) Math.round((forward[0] * 3.8) * 260.0 / Math.max(1.0, forward[2] + 7.4));
+            int frontY = centerY - (int) Math.round((forward[1] * 3.8) * 260.0 / Math.max(1.0, forward[2] + 7.4));
+            drawFirePrimaryEffect(g2d, nose, new Point(frontX, frontY));
         }
     }
 
@@ -256,12 +285,22 @@ public class ShipPanel extends JPanel {
         return total / Math.max(1, face.length);
     }
 
-    private void drawFirePrimaryEffect(Graphics2D g2d, Point nose, Point centerBody) {
-        int dx = nose.x - centerBody.x;
-        int dy = nose.y - centerBody.y;
+    private void drawDebugShipLabels(Graphics2D g2d, Point[] projectedPoints) {
+        Point nose = projectedPoints[0];
+        Point tail = projectedPoints[9];
+        g2d.setFont(new Font(Font.MONOSPACED, Font.BOLD, 12));
+        g2d.setColor(new Color(255, 245, 120, 220));
+        g2d.drawString("FRONT", nose.x + 8, nose.y - 8);
+        g2d.setColor(new Color(255, 165, 120, 220));
+        g2d.drawString("BACK", tail.x + 8, tail.y + 14);
+    }
+
+    private void drawFirePrimaryEffect(Graphics2D g2d, Point nose, Point projectileTarget) {
+        int dx = projectileTarget.x - nose.x;
+        int dy = projectileTarget.y - nose.y;
         double len = Math.max(1.0, Math.hypot(dx, dy));
-        int fx = nose.x + (int) Math.round(dx / len * 24.0);
-        int fy = nose.y + (int) Math.round(dy / len * 24.0);
+        int fx = nose.x + (int) Math.round(dx / len * 28.0);
+        int fy = nose.y + (int) Math.round(dy / len * 28.0);
 
         g2d.setColor(new Color(255, 90, 90, 130));
         g2d.fillOval(fx - 12, fy - 12, 24, 24);
@@ -287,7 +326,12 @@ public class ShipPanel extends JPanel {
         g2d.drawString(String.format("Roll:  %7.2f°  (target %7.2f°)", shipState.getRollDegrees(), shipState.getTargetRollDegrees()), x, y + lineHeight * 3);
         g2d.drawString(String.format("Throttle: %6.1f%% (target %6.1f%%)", shipState.getThrottle() * 100.0, shipState.getTargetThrottle() * 100.0), x, y + lineHeight * 4);
         double mph = 100.0 + shipState.getThrottle() * 900.0;
-        g2d.drawString(String.format("Speed: %6.0f MPH", mph), x, y + lineHeight * 5);
+        double displayMph = mph + (boostActive ? 500.0 : 0.0);
+        g2d.drawString(String.format("Speed: %6.0f MPH", displayMph), x, y + lineHeight * 5);
+        if (boostActive) {
+            g2d.setColor(new Color(255, 220, 120));
+            g2d.drawString("BOOST ACTIVE (+500 MPH)", x + 220, y + lineHeight * 5);
+        }
 
         g2d.setColor(new Color(130, 190, 235));
         g2d.drawString("Flight Controls: Pitch=nose up/down | Yaw=nose left/right | Roll=bank left/right", x, y + lineHeight * 7);
@@ -298,6 +342,10 @@ public class ShipPanel extends JPanel {
         g2d.drawString("T.16000M detected: " + (joystickSnapshot.thrustmasterT16000MDetected() ? "YES" : "NO") + " | Keyboard Active: " + (keyboardActive ? "YES" : "NO"), x, y + lineHeight * 11);
         g2d.drawString("Plane Render: " + (solidPlaneEnabled ? "Solid Retro Fill + Wireframe" : "Wireframe"), x, y + lineHeight * 12);
         g2d.drawString("Raw axes: " + formatAxes(joystickSnapshot.axes()), x, y + lineHeight * 13);
+        if (debugModeEnabled) {
+            g2d.setColor(new Color(255, 170, 140));
+            g2d.drawString("DEBUG MODE", x, y + lineHeight * 14);
+        }
     }
 
     private void drawButtonPanel(Graphics2D g2d) {
@@ -366,7 +414,10 @@ public class ShipPanel extends JPanel {
             g2d.drawRoundRect(cellX, cellY, cellWidth, cellHeight, 8, 8);
 
             g2d.setColor(new Color(235, 245, 255));
-            g2d.drawString("B" + index, cellX + 7, cellY + 15);
+            String label = inputSystem != null
+                    ? inputSystem.getLogicalButtonLabel(joystickSnapshot, index)
+                    : "B" + index;
+            g2d.drawString(clipText(label, 8), cellX + 4, cellY + 15);
         }
     }
 
@@ -491,5 +542,15 @@ public class ShipPanel extends JPanel {
         double z3 = z2;
 
         return new double[]{x3, y3, z3};
+    }
+
+    private static double shortestAngleDelta(double from, double to) {
+        double delta = (to - from) % 360.0;
+        if (delta > 180.0) {
+            delta -= 360.0;
+        } else if (delta < -180.0) {
+            delta += 360.0;
+        }
+        return delta;
     }
 }
