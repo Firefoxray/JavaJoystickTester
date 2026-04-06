@@ -24,7 +24,7 @@ import java.util.StringJoiner;
  * Rendering surface.
  */
 public class ShipPanel extends JPanel {
-    private static final double RENDER_YAW_OFFSET_DEG = 180.0;
+    private static final double RENDER_YAW_OFFSET_DEG = 0.0;
     private static final double[][] SHIP_VERTICES = {
             {0.00, 0.00, 2.55},
             {-0.35, 0.12, 0.90},
@@ -141,11 +141,12 @@ public class ShipPanel extends JPanel {
         lastPitchDegrees = shipState.getPitchDegrees();
         lastRollDegrees = shipState.getRollDegrees();
 
-        double boostMultiplier = boostActive ? 2.2 : 1.0;
-        double speed = (0.82 + shipState.getThrottle() * 3.25) * boostMultiplier;
-        double yawShift = yawDelta * 52.0;
-        double pitchShift = pitchDelta * 46.0;
-        double rollShift = rollDelta * 24.0;
+        double boostMultiplier = boostActive ? 1.45 : 1.0;
+        double speed = (0.34 + shipState.getThrottle() * 1.25) * boostMultiplier;
+        double attitudeDeltaScale = deltaSec * 32.0;
+        double yawShift = yawDelta * attitudeDeltaScale;
+        double pitchShift = pitchDelta * attitudeDeltaScale;
+        double rollShift = rollDelta * attitudeDeltaScale * 0.55;
         for (double[] star : STAR_FIELD) {
             star[2] -= deltaSec * speed;
             star[0] -= yawShift + rollShift;

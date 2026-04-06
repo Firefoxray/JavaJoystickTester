@@ -3,6 +3,13 @@
 ## Unreleased
 - No unreleased entries at this time.
 
+## 0.8
+
+### Changed
+- Bumped project/app version references from `0.7` to `0.8` across `VERSION`, Gradle metadata, README, and shared app constants.
+- Flipped ship render orientation back so the ship front points away from the viewer and the back faces the camera.
+- Rebalanced starfield movement to significantly reduce disorienting motion at low speed, with much gentler yaw/pitch/roll drift (including diagonal movement) and a lower base forward-scroll rate.
+
 ## 0.7
 
 ### Added

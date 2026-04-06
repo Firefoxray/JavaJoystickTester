@@ -1,9 +1,9 @@
-# Java Joystick Tester (0.7)
+# Java Joystick Tester (0.8)
 
 A Swing/Java2D flight-input sandbox for testing keyboard and joystick controls against a ship HUD.
 
 ## Version
-Current version: `0.7`
+Current version: `0.8`
 
 ## What works in this version
 - Main entry point remains `com.fire.javajoysticktester.Main`.
