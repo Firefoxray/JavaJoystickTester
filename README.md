@@ -1,116 +1,79 @@
-# Java Joystick Tester (0.2 Alpha)
+# Java Joystick Tester (0.3 Alpha)
 
-A Swing/Java2D flight-input sandbox for testing keyboard and joystick controls against a simple ship debug HUD.
+A Swing/Java2D flight-input sandbox for testing keyboard and joystick controls against a ship HUD.
 
 ## Version
-Current version: `0.2 Alpha`
+Current version: `0.3 Alpha`
 
 ## What works in this version
 - Main entry point remains `com.fire.javajoysticktester.Main`.
 - Single-module Gradle application project (no sample `:app` module).
-- Fixed keyboard input handling by using Swing key bindings (`WHEN_IN_FOCUSED_WINDOW`) instead of frame-level `KeyListener`.
-- Real-time ship HUD for pitch, yaw, roll, and throttle.
-- Input architecture split into keyboard input, joystick input, and shared input system.
-- Joystick detection and polling via **JInput**.
-- On-screen joystick status (connected device name, access status, T.16000M detection, raw axis values, and live button state panel by button index).
-- Settings menu for preferred input device selection, joystick-controller selection, controls/status view, and trigger button mapping from detected button indices.
+- Keyboard fallback controls remain active and unchanged.
+- Joystick detection/polling via **JInput** with preferred-device + manual-controller selection.
+- Joystick axis mapping (pitch/yaw/roll/throttle), trigger action mapping, and new invert toggles for pitch/yaw/roll/throttle.
+- HUD + side panel showing live axis values, controller status, and button states.
+- T.16000M button display uses normalized numeric button IDs when available (targeting `Button 0`..`Button 15` layout).
+- Improved starfield density and motion streaking for stronger forward-flight feel.
+- `Extras` menu includes update checks and desktop launcher installation.
 
-## Controls
-Keyboard (fallback and explicit mode):
-- `Up/Down`: Pitch
-- `Left/Right`: Yaw
-- `Q/E`: Roll
-- `W/S`: Throttle
+## Run options
+- Gradle: `./gradlew run`
+- Launcher script (new): `./run_joystick_tester.sh`
 
-Menu:
-- `Settings -> Preferred Input`: `Auto`, `Keyboard`, `Joystick`
-- `Settings -> Joystick Controller`: `Auto-select (prefer T.16000M)` or manually choose any detected controller
-- `Settings -> Joystick Mapping`: remap pitch/yaw/roll/throttle axes and choose trigger button/action
-- `Settings -> Controls & Input Status...`: Shows bindings, active status, mappings, and all detected controller names
+The launcher script is suitable as a desktop-entry target and always runs from the project directory.
 
-## Controller selection behavior
-- Auto-selection now prefers **Thrustmaster T.16000M** whenever detected.
-- If no T.16000M is available, auto mode scores devices to prefer flight-oriented controllers and deprioritize common virtual/irrelevant entries (for example Steam virtual controllers).
-- You can manually pin any detected controller from `Settings -> Joystick Controller`.
-- HUD + status dialog now call out the currently active input/controller for clarity.
-- Keyboard fallback remains active whenever joystick driving is unavailable or keyboard mode is selected.
-- Joystick flight input now uses direct Star-Fox-style target control (stick deflection maps directly to ship target pitch/yaw/roll) so steering feels tied to the ship itself.
-- Starfield now flows toward the camera to reinforce forward motion, with speed influenced by throttle.
-- Trigger button mapping supports `NONE`, `BOOST`, or `FIRE_PRIMARY` actions (default trigger button is Button 0).
-- HUD keeps pitch/yaw/roll + throttle readable while a side panel shows per-button pressed states for the active controller.
-- Denser animated starfield and clearer forward ship nose/cockpit cues improve motion readability.
+## Menu overview
+### Settings
+- `Preferred Input`: `Auto`, `Keyboard`, `Joystick`
+- `Joystick Controller`: auto-select (prefer T.16000M) or manually pin a detected device
+- `Joystick Mapping`
+  - Pitch/Yaw/Roll/Throttle axis selection
+  - **Invert Axes**: invert Pitch, Yaw, Roll, Throttle
+  - Trigger button selection (from detected button indices)
+  - Trigger action (`NONE`, `BOOST`, `FIRE_PRIMARY`)
+- `Controls & Input Status...`: shows active mode, mappings, inversion state, and controller list
 
+### Extras
+- `Check for Updates...`
+- `Install Desktop Launcher`
 
-## In-app updates
-- Menu path: `Updates -> Check for Updates...`
-- The app checks the **current branch** against its upstream tracking branch (`@{u}`), not a hardcoded branch name.
-- The update dialog shows branch name, current short commit hash, and one of:
-  - already up to date
-  - update available
-  - unable to check for updates
-  - working tree has local changes
-- Auto-update is blocked when uncommitted local changes exist (commit/stash first).
-- If an update is available and you choose **Yes**, the app runs `git pull --ff-only` and attempts to restart the same `Main` entry point.
-- If restart cannot be launched automatically, the app reports the issue and asks you to relaunch manually.
-- Known limitations: requires running from a Git working tree with `git` available and an upstream branch configured; network access is needed to fetch remote updates.
+## Desktop launcher installation
+Using `Extras -> Install Desktop Launcher` on Linux creates:
+- `~/.local/share/applications/java-joystick-tester.desktop`
+- `~/.local/share/java-joystick-tester/run_joystick_tester.sh`
+- `~/.local/share/icons/java-joystick-tester/icon1.png`
+
+The launcher uses the included `images/icon1.png` and starts the app through Gradle.
+
+## T.16000M button numbering note
+JInput sometimes reports generic/raw component names depending on platform/backend.
+This build normalizes button labels using numeric identifiers where available and falls back to component order when not.
+
+- On typical T.16000M setups, this should show all 16 buttons (`Button 0`..`Button 15`).
+- If your OS/backend exposes non-numeric names only, fallback ordering may still need one-time manual trigger-button selection in the menu.
 
 ## Linux joystick permissions (`/dev/input/event*`)
 On Linux, JInput commonly reads joystick/gamepad events through `/dev/input/event*` nodes.
 
 If these are unreadable, joystick polling can fail with `Permission denied (13)` even though the app launches normally.
 
-Typical ownership is `root:input`, but modern desktops often grant per-user ACL access through logind/udev for the active local session.
+The app surfaces joystick access status in the HUD and in `Controls & Input Status...`.
 
-### Fedora guidance
-Most Fedora desktop users should prefer **logind/udev seat ACLs** (default behavior for active sessions) rather than adding users to the `input` group permanently.
-
-If ACLs are not being applied on your setup, you may need one of:
-- A correct active local login session (so logind grants ACLs),
-- A udev rule tailored for your hardware/session model, or
-- As a fallback, membership in `input` group (broader access; less preferred).
-
-The app now surfaces joystick access status in the HUD and the controls/status dialog, including a Linux permission hint when unreadable `/dev/input/event*` nodes are detected.
-
-## Joystick support
-Dependencies:
+## Joystick support dependencies
 - `implementation("net.java.jinput:jinput:2.0.10")`
 - `runtimeOnly("net.java.jinput:jinput:2.0.10:natives-all")`
 
-Runtime native setup (Gradle):
-- `extractJinputNatives` unpacks native files from the `natives-all` runtime artifact into `build/jinput-natives`.
-- The Gradle `run` task depends on that extraction task.
-- The Gradle `run` task sets `-Djava.library.path=<project>/build/jinput-natives` before launching `Main`.
+The Gradle `run` task extracts JInput natives into `build/jinput-natives` and sets `java.library.path` accordingly.
 
-Why this matters:
-- Java classes from `jinput` can load fine without natives, so the app window can still launch.
-- Joystick backends (like `LinuxEnvironmentPlugin`) require platform native libraries at runtime.
-- If `java.library.path` does not include unpacked JInput natives, joystick discovery fails with errors like `no jinput-linux64 in java.library.path`.
-
-## Run from IntelliJ and Gradle
-You should keep running from `Main`:
-- Class: `com.fire.javajoysticktester.Main`
-
-Recommended execution modes:
-- Gradle: `./gradlew run`
-- IntelliJ (recommended): enable **Run tests using: Gradle** and **Build and run using: Gradle**, then run the Gradle `run` task.
-
-If you run a plain IntelliJ Application configuration directly (not delegated to Gradle), add this VM option:
-- `-Djava.library.path=$ProjectFileDir$/build/jinput-natives`
-
-and run this once first:
-```bash
-./gradlew extractJinputNatives
-```
-
-## Limitations (0.2 Alpha)
-- Joystick axis mapping is generic and may vary by hardware.
-- No persistent control remapping UI yet.
-- No hot-plug notifications yet (controllers are polled each frame).
+## Limitations (0.3 Alpha)
+- No persistent remapping profile save/load yet.
+- No hot-plug notification UI yet (controllers are polled each frame).
+- Exact physical-button-to-index mapping can vary by OS/JInput backend even when numeric labels are available.
 
 ## Project layout
 - `src/main/java/com/fire/javajoysticktester/Main.java` – app entry point
-- `src/main/java/com/fire/javajoysticktester/ui/...` – frame/menu/update loop
-- `src/main/java/com/fire/javajoysticktester/render/...` – HUD and ship rendering
+- `src/main/java/com/fire/javajoysticktester/ui/...` – frame/menu/update loop + launcher install
+- `src/main/java/com/fire/javajoysticktester/render/...` – HUD, ship, and starfield rendering
 - `src/main/java/com/fire/javajoysticktester/model/...` – mutable ship model/state
 - `src/main/java/com/fire/javajoysticktester/input/...` – keyboard, joystick, and shared input system
 

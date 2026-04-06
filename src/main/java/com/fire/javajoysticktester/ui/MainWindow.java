@@ -12,6 +12,7 @@ import com.fire.javajoysticktester.render.ShipPanel;
 import com.fire.javajoysticktester.update.GitUpdateService;
 
 import javax.swing.ButtonGroup;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -24,6 +25,7 @@ import javax.swing.Timer;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import java.awt.BorderLayout;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +34,7 @@ import java.util.Map;
  * Main application frame.
  */
 public class MainWindow {
-    private static final String APP_VERSION = "0.2 Alpha";
+    private static final String APP_VERSION = "0.3 Alpha";
     private static final String APP_TITLE = "Java Joystick Tester (" + APP_VERSION + ")";
     private static final int WIDTH = 1000;
     private static final int HEIGHT = 700;
@@ -106,6 +108,14 @@ public class MainWindow {
         addAxisBindingMenu(mappingMenu, "Roll Axis", inputSystem::getRollAxis, inputSystem::setRollAxis);
         addAxisBindingMenu(mappingMenu, "Throttle Axis", inputSystem::getThrottleAxis, inputSystem::setThrottleAxis);
 
+        JMenu invertMenu = new JMenu("Invert Axes");
+        invertMenu.add(addInvertToggle("Invert Pitch", inputSystem::isInvertPitch, inputSystem::setInvertPitch));
+        invertMenu.add(addInvertToggle("Invert Yaw", inputSystem::isInvertYaw, inputSystem::setInvertYaw));
+        invertMenu.add(addInvertToggle("Invert Roll", inputSystem::isInvertRoll, inputSystem::setInvertRoll));
+        invertMenu.add(addInvertToggle("Invert Throttle", inputSystem::isInvertThrottle, inputSystem::setInvertThrottle));
+        mappingMenu.addSeparator();
+        mappingMenu.add(invertMenu);
+
         JMenu triggerButtonMenu = new JMenu("Trigger Button");
         triggerButtonMenu.addMenuListener(new MenuListener() {
             @Override
@@ -144,13 +154,33 @@ public class MainWindow {
         settingsMenu.add(controlsItem);
         menuBar.add(settingsMenu);
 
-        JMenu updatesMenu = new JMenu("Updates");
+        JMenu extrasMenu = new JMenu("Extras");
         JMenuItem checkUpdatesItem = new JMenuItem("Check for Updates...");
         checkUpdatesItem.addActionListener(e -> checkForUpdatesFromMenu());
-        updatesMenu.add(checkUpdatesItem);
-        menuBar.add(updatesMenu);
+        JMenuItem installDesktopLauncherItem = new JMenuItem("Install Desktop Launcher");
+        installDesktopLauncherItem.addActionListener(e -> installDesktopLauncher());
+        extrasMenu.add(checkUpdatesItem);
+        extrasMenu.addSeparator();
+        extrasMenu.add(installDesktopLauncherItem);
+        menuBar.add(extrasMenu);
 
         return menuBar;
+    }
+
+    private JCheckBoxMenuItem addInvertToggle(String label,
+                                              java.util.function.BooleanSupplier getter,
+                                              java.util.function.Consumer<Boolean> setter) {
+        JCheckBoxMenuItem item = new JCheckBoxMenuItem(label, getter.getAsBoolean());
+        item.addActionListener(e -> setter.accept(item.isSelected()));
+        return item;
+    }
+
+    private void installDesktopLauncher() {
+        Path projectRoot = Path.of(System.getProperty("user.dir", ".")).toAbsolutePath();
+        DesktopLauncherInstaller.InstallResult result = DesktopLauncherInstaller.installForCurrentUser(projectRoot);
+        int messageType = result.success() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE;
+        String title = result.success() ? "Desktop Launcher Installed" : "Desktop Launcher Installation Failed";
+        JOptionPane.showMessageDialog(frame, result.message(), title, messageType);
     }
 
     private void checkForUpdatesFromMenu() {
@@ -280,7 +310,7 @@ public class MainWindow {
         List<Integer> indices = extractButtonIndices(inputSystem.getLastJoystickSnapshot());
         if (indices.isEmpty()) {
             indices = new ArrayList<>();
-            for (int i = 0; i <= 7; i++) {
+            for (int i = 0; i <= 15; i++) {
                 indices.add(i);
             }
         }
@@ -352,12 +382,20 @@ public class MainWindow {
         text.append(" - T.16000M detected: ").append(snapshot.thrustmasterT16000MDetected() ? "YES" : "NO").append("\n");
 
         text.append("\nJoystick mapping:\n");
-        text.append(" - Pitch axis: ").append(inputSystem.getPitchAxis().label()).append("\n");
-        text.append(" - Yaw axis: ").append(inputSystem.getYawAxis().label()).append("\n");
-        text.append(" - Roll axis: ").append(inputSystem.getRollAxis().label()).append("\n");
-        text.append(" - Throttle axis: ").append(inputSystem.getThrottleAxis().label()).append("\n");
+        text.append(" - Pitch axis: ").append(inputSystem.getPitchAxis().label())
+                .append(inputSystem.isInvertPitch() ? " (inverted)" : "").append("\n");
+        text.append(" - Yaw axis: ").append(inputSystem.getYawAxis().label())
+                .append(inputSystem.isInvertYaw() ? " (inverted)" : "").append("\n");
+        text.append(" - Roll axis: ").append(inputSystem.getRollAxis().label())
+                .append(inputSystem.isInvertRoll() ? " (inverted)" : "").append("\n");
+        text.append(" - Throttle axis: ").append(inputSystem.getThrottleAxis().label())
+                .append(inputSystem.isInvertThrottle() ? " (inverted)" : "").append("\n");
         text.append(" - Trigger: Button ").append(inputSystem.getTriggerButtonIndex())
                 .append(" -> ").append(inputSystem.getTriggerButtonAction()).append("\n");
+
+        text.append("\nButton numbering note:\n");
+        text.append(" - Buttons are shown as indices parsed from JInput identifiers when available.\n");
+        text.append(" - If a device reports non-numeric button names, fallback indexing is used in detected order.\n");
 
         if (snapshot.linuxPermissionDenied()) {
             text.append("\nLinux hint: your user may need active-seat ACLs (logind/udev) or input-group access for /dev/input/event*.\n");
@@ -373,8 +411,8 @@ public class MainWindow {
 
         JTextArea area = new JTextArea(text.toString());
         area.setEditable(false);
-        area.setRows(24);
-        area.setColumns(60);
+        area.setRows(26);
+        area.setColumns(64);
 
         JOptionPane.showMessageDialog(frame, area, "Controls & Input Status", JOptionPane.INFORMATION_MESSAGE);
     }
